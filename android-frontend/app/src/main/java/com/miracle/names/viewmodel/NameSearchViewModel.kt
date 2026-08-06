@@ -22,6 +22,12 @@ class NameSearchViewModel : ViewModel() {
     private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
     val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
+    private val _connectionError = MutableStateFlow<String?>(null)
+    val connectionError: StateFlow<String?> = _connectionError.asStateFlow()
+
+    private val _isCheckingConnection = MutableStateFlow(true)
+    val isCheckingConnection: StateFlow<Boolean> = _isCheckingConnection.asStateFlow()
+
     // Form inputs state
     val searchMode = MutableStateFlow("standalone") // "standalone", "combined", "semantic"
     val surname = MutableStateFlow("")
@@ -106,24 +112,36 @@ class NameSearchViewModel : ViewModel() {
     }
 
     private fun fetchCelebrities() {
+        _isCheckingConnection.value = true
         viewModelScope.launch {
             try {
                 val response = RetrofitClient.apiService.getCelebrities()
-                if (response.isSuccessful) {
-                    val data = response.body()?.data
-                    if (!data.isNullOrEmpty()) {
-                        celebrities.value = data
-                        if (prototypeName.value.isEmpty()) {
-                            val firstCeleb = data.first()
-                            prototypeName.value = firstCeleb.name
-                            decodeCurrentName(firstCeleb.name)
-                        }
+                val body = response.body()
+                if (!response.isSuccessful || body == null || body.error) {
+                    _connectionError.value = "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่"
+                    return@launch
+                }
+
+                _connectionError.value = null
+                val data = body.data
+                if (data.isNotEmpty()) {
+                    celebrities.value = data
+                    if (prototypeName.value.isEmpty()) {
+                        val firstCeleb = data.first()
+                        prototypeName.value = firstCeleb.name
+                        decodeCurrentName(firstCeleb.name)
                     }
                 }
             } catch (e: Exception) {
-                // Ignore error, fallback to empty list or handled gracefully
+                _connectionError.value = "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่"
+            } finally {
+                _isCheckingConnection.value = false
             }
         }
+    }
+
+    fun retryBackendConnection() {
+        fetchCelebrities()
     }
 
     fun searchNames() {

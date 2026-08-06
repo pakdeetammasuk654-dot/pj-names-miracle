@@ -68,32 +68,40 @@ fun MainContent(viewModel: NameSearchViewModel) {
     val uiState by viewModel.uiState.collectAsState()
     val selectedItem by viewModel.selectedItem.collectAsState()
     val showGuideSheet by viewModel.showGuideSheet.collectAsState()
+    val connectionError by viewModel.connectionError.collectAsState()
+    val isCheckingConnection by viewModel.isCheckingConnection.collectAsState()
 
-    // 1. Show Blessing Card screen if an item is selected
-    if (selectedItem != null) {
+    when {
+        isCheckingConnection -> MagicalLoadingScreen()
+        connectionError != null -> ErrorScreen(
+            message = connectionError!!,
+            onRetry = { viewModel.retryBackendConnection() }
+        )
+        selectedItem != null -> {
         BlessingCardScreen(item = selectedItem!!, viewModel = viewModel)
-    } else {
-        // 2. Show UI states: Idle Form, Loading, Results, or Error
-        when (val state = uiState) {
-            is UiState.Idle -> {
-                SearchWizardScreen(viewModel = viewModel)
-            }
-            is UiState.Loading -> {
-                MagicalLoadingScreen()
-            }
-            is UiState.Success -> {
-                NameResultsScreen(
-                    results = state.results,
-                    mode = state.mode,
-                    viewModel = viewModel
-                )
-            }
-            is UiState.Error -> {
-                ErrorScreen(
-                    message = state.message,
-                    onRetry = { viewModel.searchNames() },
-                    onBack = { viewModel.resetToForm() }
-                )
+        }
+        else -> {
+            when (val state = uiState) {
+                is UiState.Idle -> {
+                    SearchWizardScreen(viewModel = viewModel)
+                }
+                is UiState.Loading -> {
+                    MagicalLoadingScreen()
+                }
+                is UiState.Success -> {
+                    NameResultsScreen(
+                        results = state.results,
+                        mode = state.mode,
+                        viewModel = viewModel
+                    )
+                }
+                is UiState.Error -> {
+                    ErrorScreen(
+                        message = state.message,
+                        onRetry = { viewModel.searchNames() },
+                        onBack = { viewModel.resetToForm() }
+                    )
+                }
             }
         }
     }
@@ -161,7 +169,7 @@ fun MagicalLoadingScreen() {
 }
 
 @Composable
-fun ErrorScreen(message: String, onRetry: () -> Unit, onBack: () -> Unit) {
+fun ErrorScreen(message: String, onRetry: () -> Unit, onBack: (() -> Unit)? = null) {
     Box(
         modifier = Modifier
             .fillMaxSize()
@@ -194,8 +202,10 @@ fun ErrorScreen(message: String, onRetry: () -> Unit, onBack: () -> Unit) {
             )
             Spacer(modifier = Modifier.height(24.dp))
             Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                OutlinedButton(onClick = onBack) {
-                    Text("กลับไปแก้ไข")
+                if (onBack != null) {
+                    OutlinedButton(onClick = onBack) {
+                        Text("กลับไปแก้ไข")
+                    }
                 }
                 Button(onClick = onRetry) {
                     Text("ลองใหม่")
