@@ -68,28 +68,37 @@ fun NameResultsScreen(
             colors = CardDefaults.cardColors(containerColor = CardBgDark)
         ) {
             Column(
-                modifier = Modifier.padding(12.dp),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
-            ) {
-                Text(
-                    text = "📌 โหมด: ${if (mode == "combined") "รวมชื่อ+นามสกุล" else "เฉพาะชื่อตัว"}",
-                    color = GoldLight,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            modifier = Modifier.padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(4.dp)
+        ) {
                 val displayWish = if (viewModel.selectedWish.value.isNotEmpty()) viewModel.selectedWish.value else viewModel.prototypeName.value
-                if (displayWish.isNotEmpty()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "💬 AI Wish: $displayWish",
-                        color = Color.White,
-                        fontSize = 12.sp
+                        text = "📌 โหมด: ${if (mode == "combined") "รวมชื่อ+นามสกุล" else "เฉพาะชื่อตัว"}",
+                        color = GoldLight,
+                        fontSize = 13.sp,
+                        fontWeight = FontWeight.Bold,
+                        maxLines = 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                        modifier = Modifier.weight(if (displayWish.isNotEmpty()) 0.55f else 1f)
                     )
+                    if (displayWish.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(12.dp))
+                        Text(
+                            text = "💬 AI Wish: $displayWish",
+                            color = Color.White,
+                            fontSize = 12.sp,
+                            maxLines = 1,
+                            overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
+                            modifier = Modifier.weight(0.45f)
+                        )
+                    }
                 }
 
                 val semWeightPercent = (viewModel.semanticWeight.value * 100).toInt()
                 val numWeightPercent = 100 - semWeightPercent
                 Text(
-                    text = "⚖️ สัดส่วนน้ำหนัก: ⭐ เลขศาสตร์ ${numWeightPercent}%   🎯 ความหมาย ${semWeightPercent}%",
+                    text = "⚖️ ⭐ เลขศาสตร์ ${numWeightPercent}%   🎯 ความหมาย ${semWeightPercent}%",
                     color = GoldLight.copy(alpha = 0.9f),
                     fontSize = 12.sp,
                     fontWeight = FontWeight.Medium
