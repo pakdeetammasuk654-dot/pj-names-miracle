@@ -65,3 +65,31 @@ func TestAllPairsAreGoodRejectsOneBadPairInMultiDigitTotal(t *testing.T) {
 		t.Fatal("expected total 147 to be rejected because pair 47 is bad")
 	}
 }
+
+func TestEligibleBaseSumsUsesPostSurnameTotalsAcrossFullRange(t *testing.T) {
+	numbers := map[int]domain.NumberMeaning{
+		14: {PairType: "D8"},
+		24: {PairType: "D10"},
+		42: {PairType: "D10"},
+		47: {PairType: "R5"},
+	}
+
+	eligible := eligibleBaseSums(23, 120, numbers)
+	got := make(map[int]bool, len(eligible))
+	for _, sum := range eligible {
+		got[sum] = true
+	}
+
+	if !got[1] { // 1 + 23 = 24 (D10)
+		t.Fatal("expected base sum 1 to be eligible after surname sum 23")
+	}
+	if !got[19] { // 19 + 23 = 42 (D10)
+		t.Fatal("expected base sum 19 to be eligible after surname sum 23")
+	}
+	if got[24] { // 24 + 23 = 47 (R5)
+		t.Fatal("expected base sum 24 to be excluded after surname sum 23")
+	}
+	if !got[119] { // 119 + 23 = 142 -> 14, 42 (both D)
+		t.Fatal("expected multi-digit total 142 to be eligible")
+	}
+}

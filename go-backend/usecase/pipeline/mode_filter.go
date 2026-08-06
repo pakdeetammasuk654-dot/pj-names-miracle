@@ -29,7 +29,7 @@ func (f *ModeFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayl
 	}
 	payload.GoodNumbers = allMap
 
-	// Filter good numbers map (D-type) for Step 1 candidate search
+	// Filter good numbers map (D-type) for standalone candidate search.
 	goodMap := make(map[int]domain.NumberMeaning)
 	for k, v := range allMap {
 		if v.IsGood() {
@@ -43,7 +43,7 @@ func (f *ModeFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayl
 	}
 
 	// Mode A, B & C (Semantic Wish): Fetch candidates and pass to ScoringFilter for AI Vector Ranking
-	fetchLimit := 200
+	fetchLimit := 1000
 	var candidates []domain.NameResultItem
 
 	goodSumList := make([]int, 0, len(goodMap))
@@ -52,14 +52,25 @@ func (f *ModeFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayl
 	}
 	sort.Ints(goodSumList)
 
+	targetSatSums := goodSumList
+	targetShaSums := goodSumList
+	if payload.Request.Mode == domain.ModeCombined {
+		maxSatSum, maxShaSum, err := f.repo.GetNameSumMaximums(ctx)
+		if err != nil {
+			return fmt.Errorf("mode filter error loading name sum ranges: %w", err)
+		}
+		targetSatSums = eligibleBaseSums(payload.SurnameSatSum, maxSatSum, allMap)
+		targetShaSums = eligibleBaseSums(payload.SurnameShaSum, maxShaSum, allMap)
+	}
+
 	if payload.Request.WishQuery != "" {
 		var cands []domain.NameResultItem
 		var err error
 
 		if payload.Request.IsNameIntent {
-			cands, err = f.repo.SearchSimilarNames(ctx, goodSumList, goodSumList, payload.Request.WishQuery, payload.Request.DayOfBirth, fetchLimit)
+			cands, err = f.repo.SearchSimilarNames(ctx, targetSatSums, targetShaSums, payload.Request.WishQuery, payload.Request.DayOfBirth, fetchLimit)
 		} else {
-			cands, err = f.repo.SearchSemanticWishNames(ctx, goodSumList, goodSumList, payload.Request.WishQuery, payload.Request.DayOfBirth, fetchLimit)
+			cands, err = f.repo.SearchSemanticWishNames(ctx, targetSatSums, targetShaSums, payload.Request.WishQuery, payload.Request.DayOfBirth, fetchLimit)
 		}
 
 		if err == nil && len(cands) > 0 {
@@ -69,7 +80,7 @@ func (f *ModeFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayl
 	}
 
 	if len(candidates) == 0 {
-		cands, err := f.repo.SearchCandidateNames(ctx, goodSumList, goodSumList, payload.Request.DayOfBirth, payload.Request.WishQuery, fetchLimit)
+		cands, err := f.repo.SearchCandidateNames(ctx, targetSatSums, targetShaSums, payload.Request.DayOfBirth, payload.Request.WishQuery, fetchLimit)
 		if err != nil {
 			return fmt.Errorf("mode filter error fetching candidates: %w", err)
 		}
@@ -78,6 +89,23 @@ func (f *ModeFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayl
 
 	payload.Candidates = candidates
 	return nil
+}
+
+// eligibleBaseSums translates the post-surname safety rule into indexed
+// sat_sum/sha_sum values that PostgreSQL can filter before ranking. It scans the
+// actual sum range in names_miracle, not just the 00-99 dictionary keys.
+func eligibleBaseSums(surnameSum, maxBaseSum int, numbers map[int]domain.NumberMeaning) []int {
+	if maxBaseSum < 0 {
+		return nil
+	}
+
+	eligible := make([]int, 0)
+	for baseSum := 0; baseSum <= maxBaseSum; baseSum++ {
+		if allPairsAreGood(formatTotalValue(baseSum+surnameSum), numbers) {
+			eligible = append(eligible, baseSum)
+		}
+	}
+	return eligible
 }
 
 // formatTotalValue splits multi-digit totals into 2-digit pairs (e.g. 163 -> ["16", "63"], 91 -> ["91"])

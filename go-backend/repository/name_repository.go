@@ -27,11 +27,23 @@ type NameRepository interface {
 	GetGoodNumbersMap(ctx context.Context) (map[int]domain.NumberMeaning, error)
 	GetAllNumbersMap(ctx context.Context) (map[int]domain.NumberMeaning, error)
 	GetSurnameSums(ctx context.Context, surname string) (satSum int, shaSum int, err error)
+	GetNameSumMaximums(ctx context.Context) (maxSatSum int, maxShaSum int, err error)
 	GetSumsByTHName(ctx context.Context, thname string) (satSum int, shaSum int, meaning string, err error)
 	SearchCandidateNames(ctx context.Context, targetSatSums []int, targetShaSums []int, dayOfBirth string, wishQuery string, limit int) ([]domain.NameResultItem, error)
 	SearchSemanticWishNames(ctx context.Context, targetSatSums []int, targetShaSums []int, wishQuery string, dayOfBirth string, limit int) ([]domain.NameResultItem, error)
 	SearchSimilarNames(ctx context.Context, targetSatSums []int, targetShaSums []int, seedName string, dayOfBirth string, limit int) ([]domain.NameResultItem, error)
 	GetSampleNames(ctx context.Context) ([]domain.Celebrity, error)
+}
+
+// GetNameSumMaximums returns the real search range from names_miracle so the
+// combined-mode filter can derive every base sum compatible with a surname.
+func (r *nameRepository) GetNameSumMaximums(ctx context.Context) (int, int, error) {
+	var maxSatSum, maxShaSum int
+	query := `SELECT COALESCE(MAX(sat_sum), 0), COALESCE(MAX(sha_sum), 0) FROM names_miracle`
+	if err := r.db.QueryRowContext(ctx, query).Scan(&maxSatSum, &maxShaSum); err != nil {
+		return 0, 0, fmt.Errorf("failed to get name sum maximums: %w", err)
+	}
+	return maxSatSum, maxShaSum, nil
 }
 
 type nameRepository struct {
@@ -220,6 +232,9 @@ func (r *nameRepository) SearchCandidateNames(ctx context.Context, targetSatSums
 
 // SearchSemanticWishNames converts user wish to 1536-dim OpenAI Vector & queries pgvector HNSW Index
 func (r *nameRepository) SearchSemanticWishNames(ctx context.Context, targetSatSums []int, targetShaSums []int, wishQuery string, dayOfBirth string, limit int) ([]domain.NameResultItem, error) {
+	if len(targetSatSums) == 0 || len(targetShaSums) == 0 {
+		return []domain.NameResultItem{}, nil
+	}
 	validDays := map[string]string{
 		"sunday":     "k_sunday",
 		"monday":     "k_monday",
@@ -315,12 +330,13 @@ func (r *nameRepository) SearchSemanticWishNames(ctx context.Context, targetSatS
 				sha_sum,
 				(meaning_vector <=> $1::vector) as distance
 			FROM names_miracle 
-			WHERE meaning_vector IS NOT NULL %s
+			WHERE meaning_vector IS NOT NULL
+			AND sat_sum = ANY($3) AND sha_sum = ANY($4) %s
 			ORDER BY meaning_vector <=> $1::vector ASC
 			LIMIT $2
 		`, dayClause)
 
-		rows, err := r.db.QueryContext(ctx, vectorQuery, seedVectorStr, limit*2)
+		rows, err := r.db.QueryContext(ctx, vectorQuery, seedVectorStr, limit*2, pq.Array(targetSatSums), pq.Array(targetShaSums))
 		if err == nil {
 			defer rows.Close()
 			var results []domain.NameResultItem
@@ -336,7 +352,7 @@ func (r *nameRepository) SearchSemanticWishNames(ctx context.Context, targetSatS
 		}
 	}
 
-	return r.searchSemanticTextFallback(ctx, tokens, dayClause, limit)
+	return r.searchSemanticTextFallback(ctx, tokens, dayClause, targetSatSums, targetShaSums, limit)
 }
 
 // generateOpenAIVector calls OpenAI text-embedding-3-small API with In-Memory Caching (0ms latency for repeated/preset queries)
@@ -406,8 +422,8 @@ func generateOpenAIVector(ctx context.Context, text string) (string, error) {
 	return vecResult, nil
 }
 
-func (r *nameRepository) searchSemanticTextFallback(ctx context.Context, tokens []string, dayClause string, limit int) ([]domain.NameResultItem, error) {
-	baseWhere := "meaning IS NOT NULL AND meaning != ''" + dayClause
+func (r *nameRepository) searchSemanticTextFallback(ctx context.Context, tokens []string, dayClause string, targetSatSums []int, targetShaSums []int, limit int) ([]domain.NameResultItem, error) {
+	baseWhere := "meaning IS NOT NULL AND meaning != '' AND sat_sum = ANY($1) AND sha_sum = ANY($2)" + dayClause
 	var subClauses []string
 	for _, tok := range tokens {
 		subClauses = append(subClauses, fmt.Sprintf("meaning ILIKE '%%%s%%'", strings.ReplaceAll(tok, "'", "''")))
@@ -422,10 +438,10 @@ func (r *nameRepository) searchSemanticTextFallback(ctx context.Context, tokens 
 		SELECT name_id, thname, COALESCE(meaning, ''), sat_sum, sha_sum 
 		FROM names_miracle 
 		WHERE %s
-		LIMIT $1
+		LIMIT $3
 	`, whereClause)
 
-	rows, err := r.db.QueryContext(ctx, query, limit*2)
+	rows, err := r.db.QueryContext(ctx, query, pq.Array(targetSatSums), pq.Array(targetShaSums), limit*2)
 	if err != nil {
 		return nil, err
 	}
