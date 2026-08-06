@@ -20,9 +20,13 @@ private val LightColorScheme = lightColorScheme(
     primary = PurpleHeader,
     onPrimary = Color.White,
     secondary = GoldPrimary,
-    background = Color(0xFFF6F4F8),
-    surface = Color.White,
-    onSurface = TextPrimary
+    background = Color(0xFFF1EDF4),
+    surface = Color(0xFFFFFCFF),
+    surfaceVariant = Color(0xFFE8E1EB),
+    onSurface = TextPrimary,
+    onSurfaceVariant = Color(0xFF5F5662),
+    outline = Color(0xFF827586),
+    outlineVariant = Color(0xFFD4CBD7)
 )
 
 @Composable

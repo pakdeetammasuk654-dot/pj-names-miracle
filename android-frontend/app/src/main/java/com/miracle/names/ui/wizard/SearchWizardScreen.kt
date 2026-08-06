@@ -305,7 +305,16 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
             }
 
             Column(
-                modifier = Modifier.fillMaxWidth().padding(horizontal = 16.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp)
+                    .background(MaterialTheme.colorScheme.surface, RoundedCornerShape(20.dp))
+                    .border(
+                        width = 1.dp,
+                        color = MaterialTheme.colorScheme.outlineVariant,
+                        shape = RoundedCornerShape(20.dp)
+                    )
+                    .padding(horizontal = 12.dp, vertical = 16.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
                 // Prototype Name input: AI Wish Query Text & Analysis
@@ -571,9 +580,9 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
 
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.25f)),
-                shape = RoundedCornerShape(0.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.12f))
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f))
             ) {
                 Column(modifier = Modifier.fillMaxWidth()) {
                     currentWishList.forEachIndexed { index, wish ->
@@ -660,8 +669,9 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
             // Slider for Weight in a clean Card below
             Card(
                 modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)),
-                shape = RoundedCornerShape(12.dp)
+                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)),
+                shape = RoundedCornerShape(14.dp),
+                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f))
             ) {
                 Column(modifier = Modifier.padding(12.dp)) {
                     Text(
@@ -729,18 +739,21 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                 label = "golden_shimmer"
             )
 
-            val hasPrototypeMeaning = searchMode == "standalone" && isDecodedFromDb
+            // A highlighted database meaning is a real selection, including in
+            // name+surname mode. The UI must not ask the user to select it again.
+            val hasPrototypeMeaning = isDecodedFromDb && decodedMeaning.isNotBlank()
+            val hasMeaningSelection = selectedWish.isNotEmpty() || hasPrototypeMeaning
 
             val isFormValid = when (searchMode) {
-                "standalone" -> dayOfBirth.isNotEmpty() && (selectedWish.isNotEmpty() || hasPrototypeMeaning)
-                "combined" -> dayOfBirth.isNotEmpty() && surname.isNotEmpty() && selectedWish.isNotEmpty()
+                "standalone" -> dayOfBirth.isNotEmpty() && hasMeaningSelection
+                "combined" -> dayOfBirth.isNotEmpty() && surname.isNotEmpty() && hasMeaningSelection
                 else -> false
             }
 
             val buttonText = when {
                 dayOfBirth.isEmpty() -> "⚠️ โปรดเลือกวันเกิด"
                 searchMode == "combined" && surname.isEmpty() -> "⚠️ โปรดกรอกนามสกุล"
-                selectedWish.isEmpty() && !hasPrototypeMeaning -> "⚠️ โปรดเลือกความหมาย"
+                !hasMeaningSelection -> "⚠️ โปรดเลือกความหมาย"
                 else -> "จัดอันดับชื่อดีตามตำรา"
             }
 
