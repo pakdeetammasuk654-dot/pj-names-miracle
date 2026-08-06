@@ -16,6 +16,7 @@ import androidx.compose.animation.AnimatedVisibility
 import coil.compose.AsyncImage
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -50,6 +51,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.miracle.names.ui.theme.GoldPrimary
+import com.miracle.names.ui.theme.GoldLight
 import com.miracle.names.ui.theme.PurpleHeader
 import com.miracle.names.ui.theme.TextSecondary
 import com.miracle.names.ui.theme.CardBgDark
@@ -717,6 +719,15 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                 ),
                 label = "glow"
             )
+            val shimmerShift by infiniteTransition.animateFloat(
+                initialValue = -500f,
+                targetValue = 1200f,
+                animationSpec = infiniteRepeatable(
+                    animation = tween(2200, easing = LinearOutSlowInEasing),
+                    repeatMode = RepeatMode.Restart
+                ),
+                label = "golden_shimmer"
+            )
 
             val hasPrototypeMeaning = searchMode == "standalone" && isDecodedFromDb
 
@@ -730,7 +741,7 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                 dayOfBirth.isEmpty() -> "⚠️ โปรดเลือกวันเกิด"
                 searchMode == "combined" && surname.isEmpty() -> "⚠️ โปรดกรอกนามสกุล"
                 selectedWish.isEmpty() && !hasPrototypeMeaning -> "⚠️ โปรดเลือกความหมาย"
-                else -> "🔮 จัดลำดับชื่อตามตำราที่ดีที่สุด"
+                else -> "จัดลำดับชื่อตามตำราที่ดีที่สุด"
             }
 
             Button(
@@ -738,18 +749,18 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                 enabled = isFormValid,
                 modifier = Modifier
                     .fillMaxWidth()
-                    .padding(horizontal = 16.dp)
-                    .height(58.dp)
+                    .padding(horizontal = 12.dp)
+                    .height(64.dp)
                     .graphicsLayer {
                         if (isFormValid) {
                             scaleX = pulseScale
                             scaleY = pulseScale
-                            shadowElevation = 10f * glowAlpha
-                            shape = RoundedCornerShape(16.dp)
+                            shadowElevation = 18f * glowAlpha
+                            shape = RoundedCornerShape(18.dp)
                             clip = false
                         }
                     },
-                shape = RoundedCornerShape(16.dp),
+                shape = RoundedCornerShape(18.dp),
                 colors = ButtonDefaults.buttonColors(
                     containerColor = Color.Transparent,
                     disabledContainerColor = Color.LightGray
@@ -760,14 +771,23 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                     modifier = Modifier
                         .fillMaxSize()
                         .background(
-                            brush = Brush.horizontalGradient(
+                            brush = Brush.linearGradient(
                                 colors = if (isFormValid) listOf(
-                                    GoldPrimary.copy(alpha = 0.9f),
+                                    GoldPrimary.copy(alpha = 0.92f),
                                     GoldPrimary,
-                                    GoldPrimary.copy(alpha = 0.9f)
-                                ) else listOf(Color.Transparent, Color.Transparent)
-                            ),
-                            shape = RoundedCornerShape(16.dp)
+                                    GoldLight,
+                                    GoldPrimary,
+                                    GoldPrimary.copy(alpha = 0.92f)
+                                ) else listOf(Color.Transparent, Color.Transparent),
+                            start = Offset(shimmerShift, 0f),
+                            end = Offset(shimmerShift + 800f, 0f)
+                        ),
+                            shape = RoundedCornerShape(18.dp)
+                        )
+                        .border(
+                            width = 1.dp,
+                            color = if (isFormValid) GoldLight.copy(alpha = 0.9f) else Color.Transparent,
+                            shape = RoundedCornerShape(18.dp)
                         ),
                     contentAlignment = Alignment.Center
                 ) {
@@ -778,7 +798,9 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                                 contentDescription = null,
                                 tint = Color.Black
                             )
-                            Spacer(modifier = Modifier.width(8.dp))
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(text = "🔮", fontSize = 20.sp)
+                            Spacer(modifier = Modifier.width(7.dp))
                         }
                         Text(
                             text = buttonText,
@@ -787,6 +809,20 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                             fontSize = if (isFormValid) 17.sp else 15.sp,
                             letterSpacing = 0.5.sp
                         )
+                        if (isFormValid) {
+                            Spacer(modifier = Modifier.width(7.dp))
+                            Icon(
+                                imageVector = Icons.Default.AutoAwesome,
+                                contentDescription = null,
+                                tint = Color.Black.copy(alpha = 0.72f),
+                                modifier = Modifier
+                                    .size(16.dp)
+                                    .graphicsLayer {
+                                        scaleX = pulseScale
+                                        scaleY = pulseScale
+                                    }
+                            )
+                        }
                     }
                 }
             }
