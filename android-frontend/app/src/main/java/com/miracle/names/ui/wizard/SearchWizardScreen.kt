@@ -741,7 +741,7 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                 dayOfBirth.isEmpty() -> "⚠️ โปรดเลือกวันเกิด"
                 searchMode == "combined" && surname.isEmpty() -> "⚠️ โปรดกรอกนามสกุล"
                 selectedWish.isEmpty() && !hasPrototypeMeaning -> "⚠️ โปรดเลือกความหมาย"
-                else -> "จัดลำดับชื่อตามตำราที่ดีที่สุด"
+                else -> "จัดอันดับชื่อดีตามตำรา"
             }
 
             Button(
