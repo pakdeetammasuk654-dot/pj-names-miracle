@@ -7,7 +7,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
@@ -29,17 +29,19 @@ import com.miracle.names.ui.theme.*
 import com.miracle.names.viewmodel.NameSearchViewModel
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.ExperimentalComposeApi
 import kotlinx.coroutines.launch
-import dev.shreyaspatil.capturable.Capturable
+import dev.shreyaspatil.capturable.capturable
 import dev.shreyaspatil.capturable.controller.rememberCaptureController
 import com.miracle.names.utils.ImageUtils
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class, ExperimentalComposeApi::class)
 @Composable
 fun BlessingCardScreen(
     item: NameResultItem? = null,
@@ -60,7 +62,7 @@ fun BlessingCardScreen(
                 navigationIcon = {
                     IconButton(onClick = onBackClick) {
                         Icon(
-                            imageVector = Icons.Default.ArrowBack,
+                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                             contentDescription = "กลับ",
                             tint = GoldLight
                         )
@@ -81,8 +83,8 @@ fun BlessingCardScreen(
                 Text("ไม่พบข้อมูลการ์ดมงคล", color = Color.White)
             }
         } else {
-            val item = selectedItem
-            val fullName = if (surname.isNotBlank()) "${item.thName} $surname" else item.thName
+            val selectedName = selectedItem
+            val fullName = if (surname.isNotBlank()) "${selectedName.thName} $surname" else selectedName.thName
 
             Column(
                 modifier = Modifier
@@ -93,27 +95,11 @@ fun BlessingCardScreen(
                 horizontalAlignment = Alignment.CenterHorizontally,
                 verticalArrangement = Arrangement.Top
             ) {
-                Capturable(
-                    controller = captureController,
-                    onCaptured = { bitmap, error ->
-                        if (bitmap != null) {
-                            scope.launch {
-                                val success = ImageUtils.saveBitmapToGallery(context, bitmap.asAndroidBitmap())
-                                if (success) {
-                                    Toast.makeText(context, "บันทึกรูปลงเครื่องสำเร็จ!", Toast.LENGTH_SHORT).show()
-                                } else {
-                                    Toast.makeText(context, "เกิดข้อผิดพลาดในการบันทึกรูปภาพ", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        } else {
-                            Toast.makeText(context, "ไม่สามารถจับภาพหน้าจอได้", Toast.LENGTH_SHORT).show()
-                        }
-                    }
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .aspectRatio(9f/16f)
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(9f/16f)
+                        .capturable(captureController)
                             .clip(RoundedCornerShape(24.dp))
                             .background(
                                 brush = Brush.verticalGradient(
@@ -159,13 +145,13 @@ fun BlessingCardScreen(
 
                             // Meaning Display
                             Text(
-                                text = item.meaning.ifEmpty { "ผู้มีความสุขความเจริญ สติปัญญา และมั่งคั่งสมบูรณ์พร้อม" },
+                                text = selectedName.meaning.ifEmpty { "ผู้มีความสุขความเจริญ สติปัญญา และมั่งคั่งสมบูรณ์พร้อม" },
                                 color = Color.White,
                                 fontSize = 14.sp,
                                 textAlign = TextAlign.Center
                             )
 
-                            Divider(
+                            HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 12.dp),
                                 color = Color.Gray.copy(alpha = 0.3f)
                             )
@@ -184,13 +170,13 @@ fun BlessingCardScreen(
                                 )
                             }
 
-                            Divider(
+                            HorizontalDivider(
                                 modifier = Modifier.padding(vertical = 12.dp),
                                 color = Color.Gray.copy(alpha = 0.3f)
                             )
 
-                            val satDescDisplay = if (item.satMiracleDesc.isNotEmpty()) item.satMiracleDesc else "ถอดคู่เลขมงคลสมบูรณ์"
-                            val satPairsText = if (item.satPairsDisplay.isNotEmpty()) item.satPairsDisplay else "${item.satSum}"
+                            val satDescDisplay = if (selectedName.satMiracleDesc.isNotEmpty()) selectedName.satMiracleDesc else "ถอดคู่เลขมงคลสมบูรณ์"
+                            val satPairsText = if (selectedName.satPairsDisplay.isNotEmpty()) selectedName.satPairsDisplay else "${selectedName.satSum}"
 
                             Row(
                                 modifier = Modifier
@@ -204,7 +190,7 @@ fun BlessingCardScreen(
                                     color = Color.White,
                                     fontSize = 12.sp
                                 )
-                                com.miracle.names.ui.results.PairCircles(pairsStr = satPairsText, typesStr = item.satPairType)
+                                com.miracle.names.ui.results.PairCircles(pairsStr = satPairsText, typesStr = selectedName.satPairType)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "➔ ${satDescDisplay}",
@@ -215,8 +201,8 @@ fun BlessingCardScreen(
                                 )
                             }
 
-                            val shaDescDisplay = if (item.shaMiracleDesc.isNotEmpty()) item.shaMiracleDesc else "พลังเลขเงาสมบูรณ์"
-                            val shaPairsText = if (item.shaPairsDisplay.isNotEmpty()) item.shaPairsDisplay else "${item.shaSum}"
+                            val shaDescDisplay = if (selectedName.shaMiracleDesc.isNotEmpty()) selectedName.shaMiracleDesc else "พลังเลขเงาสมบูรณ์"
+                            val shaPairsText = if (selectedName.shaPairsDisplay.isNotEmpty()) selectedName.shaPairsDisplay else "${selectedName.shaSum}"
 
                             Row(
                                 modifier = Modifier
@@ -230,7 +216,7 @@ fun BlessingCardScreen(
                                     color = GoldLight,
                                     fontSize = 12.sp
                                 )
-                                com.miracle.names.ui.results.PairCircles(pairsStr = shaPairsText, typesStr = item.shaPairType)
+                                com.miracle.names.ui.results.PairCircles(pairsStr = shaPairsText, typesStr = selectedName.shaPairType)
                                 Spacer(modifier = Modifier.width(6.dp))
                                 Text(
                                     text = "➔ ${shaDescDisplay}",
@@ -241,9 +227,9 @@ fun BlessingCardScreen(
                                 )
                             }
 
-                            if (surname.isNotEmpty() && item.totalShaSum > 0) {
-                                val totalShaDescDisplay = if (item.shaMiracleDesc.isNotEmpty()) item.shaMiracleDesc else "ถอดคู่เลขมงคลรวมนามสกุลสมบูรณ์"
-                                val totalShaPairsText = if (item.shaPairsDisplay.isNotEmpty()) item.shaPairsDisplay else "${item.totalShaSum}"
+                            if (surname.isNotEmpty() && selectedName.totalShaSum > 0) {
+                                val totalShaDescDisplay = if (selectedName.shaMiracleDesc.isNotEmpty()) selectedName.shaMiracleDesc else "ถอดคู่เลขมงคลรวมนามสกุลสมบูรณ์"
+                                val totalShaPairsText = if (selectedName.shaPairsDisplay.isNotEmpty()) selectedName.shaPairsDisplay else "${selectedName.totalShaSum}"
 
                                 Row(
                                     modifier = Modifier
@@ -257,7 +243,7 @@ fun BlessingCardScreen(
                                         color = Color.White,
                                         fontSize = 12.sp
                                     )
-                                    com.miracle.names.ui.results.PairCircles(pairsStr = totalShaPairsText, typesStr = item.shaPairType)
+                                    com.miracle.names.ui.results.PairCircles(pairsStr = totalShaPairsText, typesStr = selectedName.shaPairType)
                                     Spacer(modifier = Modifier.width(6.dp))
                                     Text(
                                         text = "➔ ${totalShaDescDisplay}",
@@ -270,13 +256,25 @@ fun BlessingCardScreen(
                             }
                         }
                     }
-                }
-
                 Spacer(modifier = Modifier.height(16.dp))
 
                 // Action Buttons
                 Button(
-                    onClick = { captureController.capture() },
+                    onClick = {
+                        scope.launch {
+                            try {
+                                val bitmap = captureController.captureAsync().await()
+                                val success = ImageUtils.saveBitmapToGallery(context, bitmap.asAndroidBitmap())
+                                if (success) {
+                                    Toast.makeText(context, "บันทึกรูปลงเครื่องสำเร็จ!", Toast.LENGTH_SHORT).show()
+                                } else {
+                                    Toast.makeText(context, "เกิดข้อผิดพลาดในการบันทึกรูปภาพ", Toast.LENGTH_SHORT).show()
+                                }
+                            } catch (_: Throwable) {
+                                Toast.makeText(context, "ไม่สามารถจับภาพหน้าจอได้", Toast.LENGTH_SHORT).show()
+                            }
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(50.dp),

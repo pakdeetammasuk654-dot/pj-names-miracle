@@ -40,7 +40,7 @@ fun MethodologyGuideSheet(
                 fontSize = 13.sp
             )
 
-            Divider(color = GoldPrimary.copy(alpha = 0.5f))
+            HorizontalDivider(color = GoldPrimary.copy(alpha = 0.5f))
 
             Text(
                 text = "1. หลักการกาลกิณี (Kalakini Safety - 100% Safe)",

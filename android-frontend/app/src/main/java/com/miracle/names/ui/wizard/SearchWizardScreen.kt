@@ -164,7 +164,7 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Header Bar
-        SmallTopAppBar(
+        TopAppBar(
             title = {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
@@ -190,7 +190,7 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                     )
                 }
             },
-            colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = PurpleHeader)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = PurpleHeader)
         )
 
         Column(

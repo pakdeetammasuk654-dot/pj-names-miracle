@@ -10,7 +10,7 @@ import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
@@ -40,7 +40,7 @@ fun NameResultsScreen(
             .background(MaterialTheme.colorScheme.background)
     ) {
         // Top App Bar
-        SmallTopAppBar(
+        TopAppBar(
             title = {
                 Text(
                     text = "🏆 ผลจัดอันดับ 100 ชื่อมงคล",
@@ -52,13 +52,13 @@ fun NameResultsScreen(
             navigationIcon = {
                 IconButton(onClick = { viewModel.resetToForm() }) {
                     Icon(
-                        imageVector = Icons.Default.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "ย้อนกลับ",
                         tint = Color.White
                     )
                 }
             },
-            colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = PurpleHeader)
+            colors = TopAppBarDefaults.topAppBarColors(containerColor = PurpleHeader)
         )
 
         // Sub-header summary info
