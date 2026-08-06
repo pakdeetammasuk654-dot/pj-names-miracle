@@ -180,11 +180,6 @@ fun NameItemCard(
     }
     val primaryTextColor = MaterialTheme.colorScheme.onSurface
     val secondaryTextColor = primaryTextColor.copy(alpha = if (isDarkSurface) 0.72f else 0.68f)
-    val reasonTextColor = when {
-        isFeatured && isDarkSurface -> GoldLight
-        isFeatured -> TextGold
-        else -> secondaryTextColor
-    }
     val scoreBadgeColor = if (isDarkSurface) PurpleAccent.copy(alpha = 0.34f) else PurpleAccent.copy(alpha = 0.12f)
     val scoreTextColor = if (isDarkSurface) GoldLight else PurpleAccent
 
@@ -278,17 +273,6 @@ fun NameItemCard(
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
-
-                if (item.rankingReasons.isNotEmpty()) {
-                    Spacer(modifier = Modifier.height(5.dp))
-                    Text(
-                        text = "✓ ${item.rankingReasons.take(if (isFeatured) 3 else 2).joinToString(" • ")}",
-                        fontSize = 11.sp,
-                        color = reasonTextColor,
-                        maxLines = if (isFeatured) 2 else 1,
-                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
-                    )
-                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 
