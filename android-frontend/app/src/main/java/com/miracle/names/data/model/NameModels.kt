@@ -28,7 +28,11 @@ data class NameResultItem(
     @SerializedName("sha_miracledesc") val shaMiracleDesc: String = "",
     @SerializedName("sat_grade_display") val satGradeDisplay: String = "",
     @SerializedName("total_score") val totalScore: Int = 0,
+    @SerializedName("numerology_score") val numerologyScore: Float = 0f,
+    @SerializedName("semantic_score") val semanticScore: Float = 0f,
+    @SerializedName("perfect_bonus") val perfectBonus: Float = 0f,
     @SerializedName("final_score") val finalScore: Float = 0f,
+    @SerializedName("ranking_reasons") val rankingReasons: List<String> = emptyList(),
     @SerializedName("is_perfect_combined") val isPerfectCombined: Boolean = false,
     @SerializedName("vector_distance") val vectorDistance: Float = 0f,
     @SerializedName("rank") val rank: Int = 0

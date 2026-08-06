@@ -12,6 +12,8 @@ import (
 // ScoringFilter ranks candidates using perfect numerology, hybrid score, and total score.
 type ScoringFilter struct{}
 
+const perfectNumerologyBonus = 8.0
+
 func NewScoringFilter() *ScoringFilter {
 	return &ScoringFilter{}
 }
@@ -19,6 +21,7 @@ func NewScoringFilter() *ScoringFilter {
 func (f *ScoringFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayload]) error {
 	payload := pCtx.Data
 	goodMap := payload.GoodNumbers
+	maxPairPoint := getMaxPairPoint(goodMap)
 	var processed []domain.NameResultItem
 
 	for _, c := range payload.Candidates {
@@ -49,45 +52,47 @@ func (f *ScoringFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchP
 			item.IsPerfectCombined = true
 		}
 
-		// Calculate Hybrid FinalScore
+		// Normalize numerology and semantic quality to the same 0-100 scale
+		// before applying the user's weights.
 		var semWeight float64 = 0.5
 		if payload.Request.SemanticWeight != nil {
-			semWeight = *payload.Request.SemanticWeight
+			semWeight = clamp(*payload.Request.SemanticWeight, 0, 1)
 		}
 		numWeight := 1.0 - semWeight
 
-		numerologyRaw := float64(item.TotalScore) / 2.0
+		pairCount := len(satPairs) + len(shaPairs)
+		numerologyRaw := normalizeNumerologyScore(item.TotalScore, pairCount, maxPairPoint)
 		semanticRaw := 0.0
 		if payload.Request.WishQuery != "" {
-			semanticRaw = (1.0 - item.VectorDistance) * 100.0
-			if semanticRaw < 0 {
-				semanticRaw = 0
-			}
+			semanticRaw = clamp((1.0-item.VectorDistance)*100.0, 0, 100)
 		} else {
-			// If no wish query, numerology dictates 100% of the score implicitly, but we just use numWeight
-			semanticRaw = 0
-			// Force numWeight to 1.0 if no semantic wish
+			// No semantic intent means numerology owns the full score.
 			numWeight = 1.0
 			semWeight = 0.0
 		}
 
+		item.NumerologyScore = numerologyRaw
+		item.SemanticScore = semanticRaw
 		item.FinalScore = (numerologyRaw * numWeight) + (semanticRaw * semWeight)
+		if item.IsPerfectCombined {
+			item.PerfectBonus = perfectNumerologyBonus
+			item.FinalScore = clamp(item.FinalScore+item.PerfectBonus, 0, 100)
+		}
+		item.RankingReasons = buildRankingReasons(item, payload.Request.DayOfBirth, payload.Request.WishQuery)
 
 		processed = append(processed, item)
 	}
 
-	// Smart Hybrid Ranking Strategy:
-	// Priority #1: IsPerfectCombined (Descending) - Names where (Name + Surname) equals perfect D-type pair numbers float to top
-	// Priority #2: FinalScore (Descending) - Hybrid weighted score (Numerology vs Semantic)
-
+	// Transparent order: hybrid score (including a disclosed perfect-pair bonus),
+	// then raw numerology points, then name ID for stable ordering.
 	sort.Slice(processed, func(i, j int) bool {
-		if processed[i].IsPerfectCombined != processed[j].IsPerfectCombined {
-			return processed[i].IsPerfectCombined
-		}
 		if processed[i].FinalScore != processed[j].FinalScore {
 			return processed[i].FinalScore > processed[j].FinalScore
 		}
-		return processed[i].TotalScore > processed[j].TotalScore
+		if processed[i].TotalScore != processed[j].TotalScore {
+			return processed[i].TotalScore > processed[j].TotalScore
+		}
+		return processed[i].NameID < processed[j].NameID
 	})
 
 	// Limit to top 100
@@ -106,6 +111,47 @@ func (f *ScoringFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchP
 
 	payload.FinalResults = processed
 	return nil
+}
+
+func getMaxPairPoint(numbers map[int]domain.NumberMeaning) int {
+	maxPoint := 0
+	for _, number := range numbers {
+		if number.PairPoint > maxPoint {
+			maxPoint = number.PairPoint
+		}
+	}
+	return maxPoint
+}
+
+func normalizeNumerologyScore(totalScore, pairCount, maxPairPoint int) float64 {
+	if pairCount <= 0 || maxPairPoint <= 0 {
+		return 0
+	}
+	return clamp(float64(totalScore)/float64(pairCount*maxPairPoint)*100.0, 0, 100)
+}
+
+func buildRankingReasons(item domain.NameResultItem, dayOfBirth, wishQuery string) []string {
+	reasons := []string{fmt.Sprintf("คะแนนเลขศาสตร์ %.0f/100", item.NumerologyScore)}
+	if item.IsPerfectCombined {
+		reasons = append(reasons, fmt.Sprintf("คู่เลขมงคลสมบูรณ์แบบ (+%.0f)", item.PerfectBonus))
+	}
+	if wishQuery != "" && item.SemanticScore >= 70 {
+		reasons = append(reasons, fmt.Sprintf("ความหมายสอดคล้อง %.0f/100", item.SemanticScore))
+	}
+	if strings.TrimSpace(dayOfBirth) != "" {
+		reasons = append(reasons, "ผ่านการกรองกาลกิณีตามวันเกิด")
+	}
+	return reasons
+}
+
+func clamp(value, min, max float64) float64 {
+	if value < min {
+		return min
+	}
+	if value > max {
+		return max
+	}
+	return value
 }
 
 func resolveSumMeaning(sum int, goodMap map[int]domain.NumberMeaning) ([]string, string, string, int) {

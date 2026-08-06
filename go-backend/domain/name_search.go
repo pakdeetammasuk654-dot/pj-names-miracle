@@ -21,24 +21,28 @@ type NameSearchRequest struct {
 }
 
 type NameResultItem struct {
-	NameID            int     `json:"name_id"`
-	THName            string  `json:"thname"`
-	Meaning           string  `json:"meaning,omitempty"`         // ความหมายของชื่อ
-	VectorDistance    float64 `json:"vector_distance,omitempty"` // ระยะทาง Vector Similarity
-	SatSum            int     `json:"sat_sum"`
-	ShaSum            int     `json:"sha_sum"`
-	TotalSatSum       int     `json:"total_sat_sum,omitempty"`
-	TotalShaSum       int     `json:"total_sha_sum,omitempty"`
-	SatPairsDisplay   string  `json:"sat_pairs_display"` // ตัวเลขคู่ 00 - 99
-	ShaPairsDisplay   string  `json:"sha_pairs_display"` // ตัวเลขคู่ 00 - 99
-	SatPairType       string  `json:"sat_pairtype"`      // D10, D8, D5
-	ShaPairType       string  `json:"sha_pairtype"`      // D10, D8, D5
-	SatMiracleDesc    string  `json:"sat_miracledesc"`
-	ShaMiracleDesc    string  `json:"sha_miracledesc"`
-	IsPerfectCombined bool    `json:"is_perfect_combined"` // true = ผลรวม (ชื่อ + นามสกุล) ได้เกรด D10/D8/D5 สมบูรณ์แบบ
-	TotalScore        int     `json:"total_score"`         // คะแนนรวมสำหรับ Rank
-	FinalScore        float64 `json:"final_score"`         // คะแนนรวมแบบ Hybrid ถ่วงน้ำหนัก
-	Rank              int     `json:"rank"`
+	NameID            int      `json:"name_id"`
+	THName            string   `json:"thname"`
+	Meaning           string   `json:"meaning,omitempty"`         // ความหมายของชื่อ
+	VectorDistance    float64  `json:"vector_distance,omitempty"` // ระยะทาง Vector Similarity
+	SatSum            int      `json:"sat_sum"`
+	ShaSum            int      `json:"sha_sum"`
+	TotalSatSum       int      `json:"total_sat_sum,omitempty"`
+	TotalShaSum       int      `json:"total_sha_sum,omitempty"`
+	SatPairsDisplay   string   `json:"sat_pairs_display"` // ตัวเลขคู่ 00 - 99
+	ShaPairsDisplay   string   `json:"sha_pairs_display"` // ตัวเลขคู่ 00 - 99
+	SatPairType       string   `json:"sat_pairtype"`      // D10, D8, D5
+	ShaPairType       string   `json:"sha_pairtype"`      // D10, D8, D5
+	SatMiracleDesc    string   `json:"sat_miracledesc"`
+	ShaMiracleDesc    string   `json:"sha_miracledesc"`
+	IsPerfectCombined bool     `json:"is_perfect_combined"` // true = ผลรวม (ชื่อ + นามสกุล) ได้เกรด D10/D8/D5 สมบูรณ์แบบ
+	TotalScore        int      `json:"total_score"`         // คะแนนรวมสำหรับ Rank
+	NumerologyScore   float64  `json:"numerology_score"`    // คะแนนเลขศาสตร์ที่ normalize แล้ว (0-100)
+	SemanticScore     float64  `json:"semantic_score"`      // คะแนนความหมายที่ normalize แล้ว (0-100)
+	PerfectBonus      float64  `json:"perfect_bonus"`       // โบนัสคู่เลขสมบูรณ์แบบ
+	FinalScore        float64  `json:"final_score"`         // คะแนนรวมแบบ Hybrid ถ่วงน้ำหนัก
+	RankingReasons    []string `json:"ranking_reasons"`     // เหตุผลสั้น ๆ ที่อธิบายอันดับ
+	Rank              int      `json:"rank"`
 }
 
 type NameSearchPayload struct {

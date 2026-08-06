@@ -96,7 +96,7 @@ fun NameResultsScreen(
             }
         }
 
-        // List of 100 auspicious name cards
+        // Curated recommendations first, followed by the complete ranked list.
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -104,9 +104,33 @@ fun NameResultsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            itemsIndexed(results) { index, item ->
+            if (results.isNotEmpty()) {
+                item {
+                    RecommendationHeader()
+                }
+            }
+            itemsIndexed(results.take(5)) { index, item ->
                 NameItemCard(
                     rank = index + 1,
+                    item = item,
+                    isFeatured = true,
+                    onClick = { viewModel.selectNameForBlessingCard(item) }
+                )
+            }
+            if (results.size > 5) {
+                item {
+                    Text(
+                        text = "รายชื่อทั้งหมด",
+                        color = GoldLight,
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 15.sp,
+                        modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)
+                    )
+                }
+            }
+            itemsIndexed(results.drop(5)) { index, item ->
+                NameItemCard(
+                    rank = index + 6,
                     item = item,
                     onClick = { viewModel.selectNameForBlessingCard(item) }
                 )
@@ -116,9 +140,33 @@ fun NameResultsScreen(
 }
 
 @Composable
+private fun RecommendationHeader() {
+    Card(
+        colors = CardDefaults.cardColors(containerColor = GoldPrimary.copy(alpha = 0.16f)),
+        shape = RoundedCornerShape(12.dp)
+    ) {
+        Column(modifier = Modifier.padding(12.dp)) {
+            Text(
+                text = "✨ 5 ชื่อที่น่าเลือกสำหรับคุณ",
+                color = GoldLight,
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold
+            )
+            Spacer(modifier = Modifier.height(3.dp))
+            Text(
+                text = "คัดจากคะแนนสมดุลและเหตุผลที่ตรวจสอบได้",
+                color = Color.White,
+                fontSize = 12.sp
+            )
+        }
+    }
+}
+
+@Composable
 fun NameItemCard(
     rank: Int,
     item: NameResultItem,
+    isFeatured: Boolean = false,
     onClick: () -> Unit
 ) {
     Card(
@@ -126,7 +174,9 @@ fun NameItemCard(
             .fillMaxWidth()
             .clickable { onClick() },
         shape = RoundedCornerShape(12.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isFeatured) GoldPrimary.copy(alpha = 0.08f) else MaterialTheme.colorScheme.surface
+        ),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
@@ -208,6 +258,17 @@ fun NameItemCard(
                     maxLines = 1,
                     overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
                 )
+
+                if (item.rankingReasons.isNotEmpty()) {
+                    Spacer(modifier = Modifier.height(5.dp))
+                    Text(
+                        text = "✓ ${item.rankingReasons.take(if (isFeatured) 3 else 2).joinToString(" • ")}",
+                        fontSize = 11.sp,
+                        color = if (isFeatured) TextGold else TextSecondary,
+                        maxLines = if (isFeatured) 2 else 1,
+                        overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(8.dp))
 

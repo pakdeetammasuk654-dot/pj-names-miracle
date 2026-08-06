@@ -79,12 +79,13 @@ The backend employs a multi-tiered sorting algorithm (`scoring_filter.go`) to en
 - When a user adjusts the weight (e.g., 100% Numerology), the `FinalScore` dynamically reflects that preference.
 
 **Ranking Priorities (The Tie-breaker System):**
-1. **Priority 1: `IsPerfectCombined` (Boolean - Descending)** 
-   - Names that achieve a perfect 'D-type' (Excellent) pair number rating for *both* their vowels (Sat) and consonants (Sha) are hard-pinned to the top of the list, regardless of semantic weight. This guarantees that mathematically perfect astrological names are never buried.
-2. **Priority 2: `FinalScore` (Float - Descending)**
-   - The hybrid score based on user-defined weights (Numerology vs. AI Semantic Match).
-3. **Priority 3: `TotalScore` (Integer - Descending)**
+1. **Priority 1: `FinalScore` (Float - Descending)**
+   - Both numerology and semantic relevance are normalized to 0–100 before the user-selected weights are applied.
+   - A name with perfect D-type pairs for both Numerology and Shadow Power receives a visible +8 bonus, rather than being hard-pinned above the user’s selected semantic intent.
+2. **Priority 2: `TotalScore` (Integer - Descending)**
    - The raw numerology score (total points from pair meanings). Used as a tie-breaker if `FinalScore` is identical.
+3. **Priority 3: `NameID` (Ascending)**
+   - A stable final tie-breaker prevents results with equal scores from reshuffling between identical requests.
 
 **UX & Ranking Philosophy:**
 - **Intentional Simplicity (No Over-filtering)**: We strictly limit tie-breakers to pair-number quality, hybrid score, and total score. Overcomplicating the sorting logic makes the algorithm opaque and difficult for the user to understand. A broader pool of top-tier names lets people make the final choice based on personal preference and sound.
