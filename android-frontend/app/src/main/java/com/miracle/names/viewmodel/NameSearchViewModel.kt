@@ -54,6 +54,7 @@ class NameSearchViewModel : ViewModel() {
 
     companion object {
         const val DEFAULT_WISH = "🌸 เสริมดวงมงคลรอบด้าน (ทุกมิติชีวิต)"
+        const val CONNECTION_ERROR_MESSAGE = "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่"
     }
 
     init {
@@ -92,22 +93,15 @@ class NameSearchViewModel : ViewModel() {
                     return@launch
                 }
             } catch (e: Exception) {
-                // Fallback to local numerology calculation
+                // The backend owns numerology calculations. Do not show a
+                // different local result when the API is unavailable.
             }
-            
-            // Local fallback
-            val clean = name.trim().replace(" ", "")
-            val numbers = com.miracle.names.utils.NumerologyCalculator.decodeString(clean)
-            val pairs = com.miracle.names.utils.NumerologyCalculator.getPairs(numbers)
-            val types = pairs.map { com.miracle.names.utils.NumerologyCalculator.getPairType(it) }
-            decodedPairs.value = pairs
-            decodedPairTypes.value = types
+
+            decodedPairs.value = emptyList()
+            decodedPairTypes.value = emptyList()
             decodedMeaning.value = ""
             isDecodedFromDb.value = false
-            // Auto-select first preset wish when no meaning in DB
-            if (selectedWish.value.isEmpty()) {
-                selectedWish.value = DEFAULT_WISH
-            }
+            _connectionError.value = CONNECTION_ERROR_MESSAGE
         }
     }
 
@@ -118,7 +112,7 @@ class NameSearchViewModel : ViewModel() {
                 val response = RetrofitClient.apiService.getCelebrities()
                 val body = response.body()
                 if (!response.isSuccessful || body == null || body.error) {
-                    _connectionError.value = "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่"
+                    _connectionError.value = CONNECTION_ERROR_MESSAGE
                     return@launch
                 }
 
@@ -130,10 +124,12 @@ class NameSearchViewModel : ViewModel() {
                         val firstCeleb = data.first()
                         prototypeName.value = firstCeleb.name
                         decodeCurrentName(firstCeleb.name)
+                    } else {
+                        decodeCurrentName(prototypeName.value)
                     }
                 }
             } catch (e: Exception) {
-                _connectionError.value = "ไม่สามารถเชื่อมต่อกับเซิร์ฟเวอร์ได้ กรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่"
+                _connectionError.value = CONNECTION_ERROR_MESSAGE
             } finally {
                 _isCheckingConnection.value = false
             }
