@@ -46,7 +46,6 @@ func (f *ModeFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayl
 	fetchLimit := 200
 	var candidates []domain.NameResultItem
 
-
 	goodSumList := make([]int, 0, len(goodMap))
 	for num := range goodMap {
 		goodSumList = append(goodSumList, num)
@@ -56,11 +55,11 @@ func (f *ModeFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayl
 	if payload.Request.WishQuery != "" {
 		var cands []domain.NameResultItem
 		var err error
-		
+
 		if payload.Request.IsNameIntent {
-			cands, err = f.repo.SearchSimilarNames(ctx, goodSumList, goodSumList, payload.Request.WishQuery, payload.Request.DayOfBirth, payload.Request.Gender, fetchLimit)
+			cands, err = f.repo.SearchSimilarNames(ctx, goodSumList, goodSumList, payload.Request.WishQuery, payload.Request.DayOfBirth, fetchLimit)
 		} else {
-			cands, err = f.repo.SearchSemanticWishNames(ctx, goodSumList, goodSumList, payload.Request.WishQuery, payload.Request.DayOfBirth, payload.Request.Gender, fetchLimit)
+			cands, err = f.repo.SearchSemanticWishNames(ctx, goodSumList, goodSumList, payload.Request.WishQuery, payload.Request.DayOfBirth, fetchLimit)
 		}
 
 		if err == nil && len(cands) > 0 {
@@ -70,7 +69,7 @@ func (f *ModeFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayl
 	}
 
 	if len(candidates) == 0 {
-		cands, err := f.repo.SearchCandidateNames(ctx, goodSumList, goodSumList, payload.Request.DayOfBirth, payload.Request.Gender, payload.Request.WishQuery, fetchLimit)
+		cands, err := f.repo.SearchCandidateNames(ctx, goodSumList, goodSumList, payload.Request.DayOfBirth, payload.Request.WishQuery, fetchLimit)
 		if err != nil {
 			return fmt.Errorf("mode filter error fetching candidates: %w", err)
 		}

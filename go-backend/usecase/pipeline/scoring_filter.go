@@ -9,7 +9,7 @@ import (
 	"go-backend/domain"
 )
 
-// ScoringFilter ranks candidate names prioritizing Chosen Taksa Target #1, AI Semantic Vector Match #2, Total Score #3
+// ScoringFilter ranks candidates using perfect numerology, hybrid score, and total score.
 type ScoringFilter struct{}
 
 func NewScoringFilter() *ScoringFilter {
@@ -19,18 +19,10 @@ func NewScoringFilter() *ScoringFilter {
 func (f *ScoringFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayload]) error {
 	payload := pCtx.Data
 	goodMap := payload.GoodNumbers
-	dayOfBirth := payload.Request.DayOfBirth
-	taksaTarget := payload.Request.TaksaTarget
-	if taksaTarget == "" {
-		taksaTarget = "sri"
-	}
-
 	var processed []domain.NameResultItem
 
 	for _, c := range payload.Candidates {
 		item := c
-
-
 
 		if payload.Request.Mode == domain.ModeCombined {
 			item.TotalSatSum = item.SatSum + payload.SurnameSatSum
@@ -40,12 +32,7 @@ func (f *ScoringFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchP
 			item.TotalShaSum = item.ShaSum
 		}
 
-		// Priority #1: Calculate user-chosen Taksa target character count (Sri, Dech, Montri, Mula, Utsaha, Ayu, Bariwan)
-		item.TaksaCount = CountTaksaRunes(item.THName, dayOfBirth, taksaTarget)
-		item.TaksaLabel = GetTaksaLabelThai(taksaTarget)
-		item.TaksaChars = GetTaksaMatchedChars(item.THName, dayOfBirth, taksaTarget)
-
-		// Priority #3: Resolve PairType meanings & total points
+		// Resolve pair meanings and total points from the central dictionary.
 		satPairs, satType, satDesc, satPoint := resolveSumMeaning(item.TotalSatSum, goodMap)
 		shaPairs, shaType, shaDesc, shaPoint := resolveSumMeaning(item.TotalShaSum, goodMap)
 
@@ -83,7 +70,7 @@ func (f *ScoringFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchP
 			numWeight = 1.0
 			semWeight = 0.0
 		}
-		
+
 		item.FinalScore = (numerologyRaw * numWeight) + (semanticRaw * semWeight)
 
 		processed = append(processed, item)
@@ -166,32 +153,4 @@ func resolveSumMeaning(sum int, goodMap map[int]domain.NumberMeaning) ([]string,
 	}
 
 	return formattedPairs, typeStr, descStr, totalPoint
-}
-
-// countThaiSyllables calculates actual Thai syllable count accurately
-func countThaiSyllables(name string) int {
-	runes := []rune(strings.TrimSpace(name))
-	if len(runes) == 0 {
-		return 0
-	}
-
-	// Names with <= 2 runes (e.g. เช, ชู, พล, นพ, ชา) are strictly 1 syllable in names
-	if len(runes) <= 2 {
-		return 1
-	}
-
-	// Count explicit Thai vowel clusters/nuclei
-	nucleusCount := 0
-	for _, r := range runes {
-		switch r {
-		case 'ะ', 'า', 'ำ', 'ิ', 'ี', 'ึ', 'ื', 'ุ', 'ู', 'เ', 'แ', 'โ', 'ใ', 'ไ', 'ฤ':
-			nucleusCount++
-		}
-	}
-
-	if nucleusCount == 0 {
-		nucleusCount = 1
-	}
-
-	return nucleusCount
 }

@@ -32,11 +32,8 @@ class NameSearchViewModel : ViewModel() {
     val searchMode = MutableStateFlow("standalone") // "standalone", "combined", "semantic"
     val surname = MutableStateFlow("")
     val dayOfBirth = MutableStateFlow("")
-    val gender = MutableStateFlow("all") // "male", "female", "all"
-    val taksaTarget = MutableStateFlow("sri")
     val prototypeName = MutableStateFlow("")
     val selectedWish = MutableStateFlow(DEFAULT_WISH)
-    val filterTwoSyllables = MutableStateFlow(false)
     val semanticWeight = MutableStateFlow(0.5f)
 
     // Selected item for Blessing Card View
@@ -152,24 +149,17 @@ class NameSearchViewModel : ViewModel() {
                 val hasMeaningFromDb = isDecodedFromDb.value && decodedMeaning.value.isNotEmpty()
                 val hasMeaningFromWish = currentSelectedWish.isNotEmpty()
 
-                var finalWishQuery = ""
-                var finalIsNameIntent = false
-                var effectiveSemanticWeight = semanticWeight.value
-
-                when {
+                val (finalWishQuery, finalIsNameIntent) = when {
                     hasMeaningFromWish -> {
-                        finalWishQuery = currentSelectedWish
-                        finalIsNameIntent = false
+                        currentSelectedWish to false
                     }
                     hasMeaningFromDb -> {
                         // Use the name itself for vector similarity (name has embedding in DB)
-                        finalWishQuery = currentPrototype
-                        finalIsNameIntent = true
+                        currentPrototype to true
                     }
                     else -> {
                         // Fallback to default wish when no meaning in name or DB
-                        finalWishQuery = DEFAULT_WISH
-                        finalIsNameIntent = false
+                        DEFAULT_WISH to false
                     }
                 }
 
@@ -177,11 +167,8 @@ class NameSearchViewModel : ViewModel() {
                     mode = effectiveMode,
                     surname = surname.value,
                     dayOfBirth = dayOfBirth.value,
-                    gender = gender.value,
-                    taksaTarget = taksaTarget.value,
                     wishQuery = finalWishQuery,
-                    minLength = if (filterTwoSyllables.value) 4 else 0,
-                    semanticWeight = effectiveSemanticWeight,
+                    semanticWeight = semanticWeight.value,
                     isNameIntent = finalIsNameIntent,
                     limit = 100
                 )

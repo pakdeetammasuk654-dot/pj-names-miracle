@@ -9,7 +9,7 @@
 ## Required product rules
 
 - Build Android UI with Jetpack Compose. Do not introduce XML layouts for ordinary UI.
-- Keep numerology, Taksa, ranking, semantic search, and other business calculations in Go. Android should own UI state and rendering only.
+- Keep numerology, Kalakini, ranking, semantic search, and other business calculations in Go. Android should own UI state and rendering only.
 - Use the Thai terminology `เลขศาสตร์` and `พลังเงา`.
 - Render every number pair with the shared colored-circle presentation (`PairCircles`), never as plain bracket text.
 

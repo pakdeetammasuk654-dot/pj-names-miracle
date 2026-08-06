@@ -1,6 +1,6 @@
 # Miracle Names
 
-Android and Go application for auspicious Thai-name analysis. The product uses numerology, Taksa/Kalakini rules, and semantic ranking to suggest and explain names.
+Android and Go application for auspicious Thai-name analysis. The product uses numerology, Kalakini safety rules, and semantic ranking to suggest and explain names.
 
 ## Structure
 

@@ -63,7 +63,7 @@ A full-stack application focused on two main features:
   - **Search Mode UI Animations**: Implemented `AnimatedVisibility` (expandVertically + fadeIn) for mode toggles and analysis sections to ensure smooth, natural UX transitions when switching between Standalone and Combined name search modes.
   - **Dynamic Wish Pinning & Auto-Refresh**: Refactored the wish list logic using `LaunchedEffect` to automatically pin both the user's selected meaning and the DB-derived name meaning (💡) to the top of the list. The auto-shuffle interval (9 seconds) strictly respects these pinned items, only shuffling unpinned meanings.
   - **Celebrity Avatars Integration**: Upgraded the `GetCelebrities` endpoint to fetch `avatar_url` from the `naming_examples` database table. Added a static file router in the Go backend (`/avatars`) to securely serve the images, and integrated `coil-compose` (`AsyncImage`) in the Android frontend to dynamically render rich circular avatars, falling back to colorful initials if images are unavailable.
-  - **Blessing Card Screen Refactoring & UI Polish**: Fixed ViewModel state flow references (`selectedItem`, `surname`), resolved theme color missing definition (`DarkBackground`), and updated the Day of Birth Taksa status UI to render continuous Thai text without brackets or emojis (`เกิดวันอาทิตย์ ปลอดกาลกิณี`).
+  - **Blessing Card Screen Refactoring & UI Polish**: Fixed ViewModel state flow references (`selectedItem`, `surname`), resolved theme color missing definition (`DarkBackground`), and updated the Day of Birth Kalakini status UI to render continuous Thai text without brackets or emojis (`เกิดวันอาทิตย์ ปลอดกาลกิณี`).
 - **Immediate Next Steps**:
   1. Continue refining search result filtering and Blessing Card detail views.
   2. Setup and test edge cases for combined name + surname calculations with surname database entries.
@@ -87,7 +87,7 @@ The backend employs a multi-tiered sorting algorithm (`scoring_filter.go`) to en
    - The raw numerology score (total points from pair meanings). Used as a tie-breaker if `FinalScore` is identical.
 
 **UX & Ranking Philosophy:**
-- **Intentional Simplicity (No Over-filtering)**: We strictly limit the number of tie-breaker factors (e.g., intentionally excluding `TaksaCount` for tie-breaking). Overcomplicating the sorting logic makes the algorithm opaque and difficult for the user to understand. By keeping the ranking factors transparent and minimal, we present users with a broader pool of equally top-tier names, allowing them the freedom to make the final choice based on personal preference and sound, rather than letting an invisible algorithm narrow down their choices arbitrarily.
+- **Intentional Simplicity (No Over-filtering)**: We strictly limit tie-breakers to pair-number quality, hybrid score, and total score. Overcomplicating the sorting logic makes the algorithm opaque and difficult for the user to understand. A broader pool of top-tier names lets people make the final choice based on personal preference and sound.
 
 ### Pair Number Decoding Strategy (การถอดรหัสคู่เลข)
 - **Sum-Based Pair Generation**: Pair numbers (คู่เลข) shown in the UI are **NOT** derived by pairing the literal numerological values of sequential letters in a name.

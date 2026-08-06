@@ -170,7 +170,7 @@ fun BlessingCardScreen(
                                 color = Color.Gray.copy(alpha = 0.3f)
                             )
 
-                            // Day & Taksa info
+                            // Day-of-birth Kalakini safety information
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalAlignment = Alignment.CenterHorizontally,

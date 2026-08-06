@@ -21,14 +21,16 @@ var (
 	vectorCacheMu sync.RWMutex
 )
 
+const maxVectorCacheEntries = 256
+
 type NameRepository interface {
 	GetGoodNumbersMap(ctx context.Context) (map[int]domain.NumberMeaning, error)
 	GetAllNumbersMap(ctx context.Context) (map[int]domain.NumberMeaning, error)
 	GetSurnameSums(ctx context.Context, surname string) (satSum int, shaSum int, err error)
 	GetSumsByTHName(ctx context.Context, thname string) (satSum int, shaSum int, meaning string, err error)
-	SearchCandidateNames(ctx context.Context, targetSatSums []int, targetShaSums []int, dayOfBirth string, gender string, wishQuery string, limit int) ([]domain.NameResultItem, error)
-	SearchSemanticWishNames(ctx context.Context, targetSatSums []int, targetShaSums []int, wishQuery string, dayOfBirth string, gender string, limit int) ([]domain.NameResultItem, error)
-	SearchSimilarNames(ctx context.Context, targetSatSums []int, targetShaSums []int, seedName string, dayOfBirth string, gender string, limit int) ([]domain.NameResultItem, error)
+	SearchCandidateNames(ctx context.Context, targetSatSums []int, targetShaSums []int, dayOfBirth string, wishQuery string, limit int) ([]domain.NameResultItem, error)
+	SearchSemanticWishNames(ctx context.Context, targetSatSums []int, targetShaSums []int, wishQuery string, dayOfBirth string, limit int) ([]domain.NameResultItem, error)
+	SearchSimilarNames(ctx context.Context, targetSatSums []int, targetShaSums []int, seedName string, dayOfBirth string, limit int) ([]domain.NameResultItem, error)
 	GetSampleNames(ctx context.Context) ([]domain.Celebrity, error)
 }
 
@@ -125,7 +127,7 @@ func (r *nameRepository) GetSumsByTHName(ctx context.Context, thname string) (in
 }
 
 // SearchCandidateNames fetches candidates from Postgres names_miracle table
-func (r *nameRepository) SearchCandidateNames(ctx context.Context, targetSatSums []int, targetShaSums []int, dayOfBirth string, gender string, wishQuery string, limit int) ([]domain.NameResultItem, error) {
+func (r *nameRepository) SearchCandidateNames(ctx context.Context, targetSatSums []int, targetShaSums []int, dayOfBirth string, wishQuery string, limit int) ([]domain.NameResultItem, error) {
 	if len(targetSatSums) == 0 && len(targetShaSums) == 0 {
 		return []domain.NameResultItem{}, nil
 	}
@@ -146,13 +148,6 @@ func (r *nameRepository) SearchCandidateNames(ctx context.Context, targetSatSums
 
 	if col, ok := validDays[dayClean]; ok {
 		whereClause += fmt.Sprintf(" AND %s = false", col)
-	}
-
-	genderClean := strings.ToLower(strings.TrimSpace(gender))
-	if genderClean == "male" {
-		whereClause += " AND (gender = 'ช' OR gender = 'ชาย' OR gender = 'm' OR gender = 'ค')"
-	} else if genderClean == "female" {
-		whereClause += " AND (gender = 'ญ' OR gender = 'หญิง' OR gender = 'f' OR gender = 'ค')"
 	}
 
 	wishClean := strings.TrimSpace(wishQuery)
@@ -224,7 +219,7 @@ func (r *nameRepository) SearchCandidateNames(ctx context.Context, targetSatSums
 }
 
 // SearchSemanticWishNames converts user wish to 1536-dim OpenAI Vector & queries pgvector HNSW Index
-func (r *nameRepository) SearchSemanticWishNames(ctx context.Context, targetSatSums []int, targetShaSums []int, wishQuery string, dayOfBirth string, gender string, limit int) ([]domain.NameResultItem, error) {
+func (r *nameRepository) SearchSemanticWishNames(ctx context.Context, targetSatSums []int, targetShaSums []int, wishQuery string, dayOfBirth string, limit int) ([]domain.NameResultItem, error) {
 	validDays := map[string]string{
 		"sunday":     "k_sunday",
 		"monday":     "k_monday",
@@ -240,13 +235,6 @@ func (r *nameRepository) SearchSemanticWishNames(ctx context.Context, targetSatS
 	dayClause := ""
 	if col, ok := validDays[dayClean]; ok {
 		dayClause = fmt.Sprintf(" AND %s = false", col)
-	}
-
-	genderClean := strings.ToLower(strings.TrimSpace(gender))
-	if genderClean == "male" {
-		dayClause += " AND (gender = 'ช' OR gender = 'ชาย' OR gender = 'm' OR gender = 'ค')"
-	} else if genderClean == "female" {
-		dayClause += " AND (gender = 'ญ' OR gender = 'หญิง' OR gender = 'f' OR gender = 'ค')"
 	}
 
 	if limit <= 0 {
@@ -407,6 +395,11 @@ func generateOpenAIVector(ctx context.Context, text string) (string, error) {
 
 	// Save to In-Memory Cache
 	vectorCacheMu.Lock()
+	if len(vectorCache) >= maxVectorCacheEntries {
+		// Preset wishes are requested repeatedly. Bounding this cache prevents an
+		// unbounded stream of custom wishes from growing the API process forever.
+		vectorCache = make(map[string]string)
+	}
 	vectorCache[cleanText] = vecResult
 	vectorCacheMu.Unlock()
 
@@ -478,7 +471,7 @@ func extractThaiTokens(text string) []string {
 }
 
 // SearchSimilarNames uses PostgreSQL pg_trgm similarity to rank names that are textually similar to the seedName
-func (r *nameRepository) SearchSimilarNames(ctx context.Context, targetSatSums []int, targetShaSums []int, seedName string, dayOfBirth string, gender string, limit int) ([]domain.NameResultItem, error) {
+func (r *nameRepository) SearchSimilarNames(ctx context.Context, targetSatSums []int, targetShaSums []int, seedName string, dayOfBirth string, limit int) ([]domain.NameResultItem, error) {
 	validDays := map[string]string{
 		"sunday":     "k_sunday",
 		"monday":     "k_monday",
@@ -494,13 +487,6 @@ func (r *nameRepository) SearchSimilarNames(ctx context.Context, targetSatSums [
 	dayClause := ""
 	if col, ok := validDays[dayClean]; ok {
 		dayClause = fmt.Sprintf(" AND %s = false", col)
-	}
-
-	genderClean := strings.ToLower(strings.TrimSpace(gender))
-	if genderClean == "male" {
-		dayClause += " AND (gender = 'ช' OR gender = 'ชาย' OR gender = 'm' OR gender = 'ค')"
-	} else if genderClean == "female" {
-		dayClause += " AND (gender = 'ญ' OR gender = 'หญิง' OR gender = 'f' OR gender = 'ค')"
 	}
 
 	if limit <= 0 {

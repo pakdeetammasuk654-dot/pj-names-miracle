@@ -18,7 +18,7 @@ func NewNameSearchUseCase(repo repository.NameRepository) domain.NameSearchUseCa
 }
 
 func (u *nameSearchUseCase) SearchTopNames(ctx context.Context, req domain.NameSearchRequest) ([]domain.NameResultItem, error) {
-	if req.Limit <= 0 {
+	if req.Limit <= 0 || req.Limit > 100 {
 		req.Limit = 100
 	}
 	if req.Mode == "" {
