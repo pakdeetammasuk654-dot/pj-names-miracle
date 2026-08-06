@@ -71,7 +71,7 @@ fun NameResultsScreen(
             modifier = Modifier.padding(12.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-                val displayWish = if (viewModel.selectedWish.value.isNotEmpty()) viewModel.selectedWish.value else viewModel.prototypeName.value
+                val displayMeaning = viewModel.selectedWish.value.ifBlank { viewModel.decodedMeaning.value }
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "📌 โหมด: ${if (mode == "combined") "รวมชื่อ+นามสกุล" else "เฉพาะชื่อตัว"}",
@@ -80,12 +80,12 @@ fun NameResultsScreen(
                         fontWeight = FontWeight.Bold,
                         maxLines = 1,
                         overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(if (displayWish.isNotEmpty()) 0.55f else 1f)
+                        modifier = Modifier.weight(if (displayMeaning.isNotEmpty()) 0.55f else 1f)
                     )
-                    if (displayWish.isNotEmpty()) {
+                    if (displayMeaning.isNotEmpty()) {
                         Spacer(modifier = Modifier.width(12.dp))
                         Text(
-                            text = "💬 AI Wish: $displayWish",
+                            text = "🎯 ความหมาย: $displayMeaning",
                             color = Color.White,
                             fontSize = 12.sp,
                             maxLines = 1,

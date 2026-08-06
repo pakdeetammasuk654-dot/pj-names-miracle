@@ -142,24 +142,23 @@ class NameSearchViewModel : ViewModel() {
             _uiState.value = UiState.Loading
             try {
                 val effectiveMode = searchMode.value
-                val currentPrototype = prototypeName.value.trim()
                 val currentSelectedWish = selectedWish.value.trim()
 
                 // Determine meaning source
                 val hasMeaningFromDb = isDecodedFromDb.value && decodedMeaning.value.isNotEmpty()
                 val hasMeaningFromWish = currentSelectedWish.isNotEmpty()
 
-                val (finalWishQuery, finalIsNameIntent) = when {
+                val finalWishQuery = when {
                     hasMeaningFromWish -> {
-                        currentSelectedWish to false
+                        currentSelectedWish
                     }
                     hasMeaningFromDb -> {
-                        // Use the name itself for vector similarity (name has embedding in DB)
-                        currentPrototype to true
+                        // The pinned database meaning is the user's active intent.
+                        decodedMeaning.value.trim()
                     }
                     else -> {
                         // Fallback to default wish when no meaning in name or DB
-                        DEFAULT_WISH to false
+                        DEFAULT_WISH
                     }
                 }
 
@@ -169,7 +168,7 @@ class NameSearchViewModel : ViewModel() {
                     dayOfBirth = dayOfBirth.value,
                     wishQuery = finalWishQuery,
                     semanticWeight = semanticWeight.value,
-                    isNameIntent = finalIsNameIntent,
+                    isNameIntent = false,
                     limit = 100
                 )
 
