@@ -39,6 +39,14 @@ func (f *ScoringFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchP
 		satPairs, satType, satDesc, satPoint := resolveSumMeaning(item.TotalSatSum, goodMap)
 		shaPairs, shaType, shaDesc, shaPoint := resolveSumMeaning(item.TotalShaSum, goodMap)
 
+		// Ranking is an auspicious-name allowlist: every displayed pair from both
+		// เลขศาสตร์ and พลังเงา must be a known D-type pair. This second check is
+		// essential in combined mode because adding the surname creates new totals
+		// that were not covered by the initial candidate query.
+		if !allPairsAreGood(satPairs, goodMap) || !allPairsAreGood(shaPairs, goodMap) {
+			continue
+		}
+
 		item.SatPairsDisplay = strings.Join(satPairs, ", ")
 		item.ShaPairsDisplay = strings.Join(shaPairs, ", ")
 		item.SatPairType = satType
@@ -111,6 +119,25 @@ func (f *ScoringFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchP
 
 	payload.FinalResults = processed
 	return nil
+}
+
+func allPairsAreGood(pairs []string, numbers map[int]domain.NumberMeaning) bool {
+	if len(pairs) == 0 {
+		return false
+	}
+
+	for _, pair := range pairs {
+		value, err := strconv.Atoi(pair)
+		if err != nil {
+			return false
+		}
+		meaning, ok := numbers[value]
+		if !ok || !meaning.IsGood() {
+			return false
+		}
+	}
+
+	return true
 }
 
 func getMaxPairPoint(numbers map[int]domain.NumberMeaning) int {

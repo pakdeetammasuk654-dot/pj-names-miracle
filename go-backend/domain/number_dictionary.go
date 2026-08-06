@@ -1,5 +1,7 @@
 package domain
 
+import "strings"
+
 type NumberMeaning struct {
 	PairNumber    string `json:"pairnumber"`
 	PairType      string `json:"pairtype"`      // D10, D8, D5, R10, R7, R5
@@ -10,5 +12,6 @@ type NumberMeaning struct {
 
 // IsGood returns true if pairtype starts with 'D' (D10, D8, D5)
 func (n NumberMeaning) IsGood() bool {
-	return len(n.PairType) > 0 && n.PairType[0] == 'D'
+	pairType := strings.ToUpper(strings.TrimSpace(n.PairType))
+	return strings.HasPrefix(pairType, "D")
 }

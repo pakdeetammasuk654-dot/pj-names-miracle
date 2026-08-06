@@ -77,6 +77,7 @@ The backend employs a multi-tiered sorting algorithm (`scoring_filter.go`) to en
 **Scoring Calculation:**
 - `FinalScore = (NumerologyRaw * NumerologyWeight) + (SemanticRaw * SemanticWeight)`
 - When a user adjusts the weight (e.g., 100% Numerology), the `FinalScore` dynamically reflects that preference.
+- **Auspicious Pair Safety Gate (before scoring):** Every generated pair for both **เลขศาสตร์** and **พลังเงา** must exist in the central number dictionary and be a D-type pair. A candidate containing any R-type or unknown pair is excluded completely, including pairs created only after combining the name with a surname. Semantic relevance can never compensate for a bad pair.
 
 **Ranking Priorities (The Tie-breaker System):**
 1. **Priority 1: `FinalScore` (Float - Descending)**
