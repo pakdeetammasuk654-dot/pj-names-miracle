@@ -54,7 +54,6 @@ import com.miracle.names.ui.theme.PurpleHeader
 import com.miracle.names.ui.theme.TextSecondary
 import com.miracle.names.ui.theme.CardBgDark
 import com.miracle.names.ui.results.PairCircles
-import com.miracle.names.utils.NumerologyCalculator
 import androidx.compose.foundation.shape.CircleShape
 import com.miracle.names.viewmodel.NameSearchViewModel
 
@@ -829,93 +828,6 @@ fun SelectableChip(
     }
 }
 
-@Composable
-fun AnalysisCard(title: String, text: String) {
-    val cleanText = text.replace(" ", "")
-    val numbers = NumerologyCalculator.decodeString(cleanText)
-    val totalSum = numbers.sum()
-    val pairs = NumerologyCalculator.getPairs(numbers)
-    
-    val pairTypesStr = pairs.joinToString(",") { NumerologyCalculator.getPairType(it) }
-    val pairsStr = pairs.joinToString(",")
-    
-    // Calculate simple Grade (Ranking)
-    val grade = when {
-        totalSum in listOf(14, 15, 19, 24, 36, 41, 42, 45, 50, 51, 54, 55, 56, 59, 63, 65) -> "ดีเยี่ยม"
-        totalSum in listOf(2, 4, 5, 6, 9, 11, 13, 16, 20, 22, 23, 26, 32, 35, 39, 40, 44, 46, 49, 52, 53, 58, 60, 61, 62, 64, 66, 68, 69) -> "ดี"
-        else -> "ปานกลาง"
-    }
-    
-    val gradeColor = when(grade) {
-        "ดีเยี่ยม" -> Color(0xFF4ADE80)
-        "ดี" -> Color(0xFF60A5FA)
-        else -> Color(0xFFFBBF24)
-    }
-
-    Card(
-        modifier = Modifier.fillMaxWidth(),
-        colors = CardDefaults.cardColors(containerColor = CardBgDark),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(12.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = title,
-                    color = GoldPrimary,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-                
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Text(
-                        text = grade,
-                        color = gradeColor,
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold
-                    )
-                    
-                    Box(
-                        modifier = Modifier
-                            .size(36.dp)
-                            .background(GoldPrimary, CircleShape),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(
-                            text = "$totalSum",
-                            color = Color.Black,
-                            fontSize = 14.sp,
-                            fontWeight = FontWeight.Bold
-                        )
-                    }
-                }
-            }
-
-            if (pairs.isNotEmpty()) {
-                Spacer(modifier = Modifier.height(10.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        text = "คู่เลขมงคล:",
-                        color = TextSecondary,
-                        fontSize = 12.sp
-                    )
-                    PairCircles(pairsStr = pairsStr, typesStr = pairTypesStr)
-                }
-            }
-        }
-    }
-}
 @Composable
 fun InstantDecoderUI(satSum: Int, shaSum: Int) {
     Card(

@@ -2,6 +2,7 @@ package usecase
 
 import (
 	"context"
+	"strings"
 
 	"go-backend/domain"
 	"go-backend/repository"
@@ -24,10 +25,14 @@ func (u *nameSearchUseCase) SearchTopNames(ctx context.Context, req domain.NameS
 		req.Mode = domain.ModeStandalone
 	}
 
-	payload := &domain.NameSearchPayload{
-		Request:       req,
-		SurnameSatSum: req.SurnameSatSum,
-		SurnameShaSum: req.SurnameShaSum,
+	payload := &domain.NameSearchPayload{Request: req}
+	if req.Mode == domain.ModeCombined && strings.TrimSpace(req.Surname) != "" {
+		satSum, shaSum, err := u.repo.GetSurnameSums(ctx, req.Surname)
+		if err != nil {
+			return nil, err
+		}
+		payload.SurnameSatSum = satSum
+		payload.SurnameShaSum = shaSum
 	}
 
 	pCtx := &domain.PipelineContext[*domain.NameSearchPayload]{
@@ -37,9 +42,9 @@ func (u *nameSearchUseCase) SearchTopNames(ctx context.Context, req domain.NameS
 
 	// Sequential Pipeline Pattern (Extensible Pipes & Filters)
 	pipe := domain.NewPipeline[*domain.NameSearchPayload](
-		pipeline.NewModeFilter(u.repo),             // Step 1: Filter D10/D8/D5 by Search Mode
-		pipeline.NewKalakiniFilter(),               // Step 2: Day of Birth Kalakini Safety Filter (100% Kalakini Free)
-		pipeline.NewScoringFilter(),                // Step Final: Scoring & Top 100 Ranking
+		pipeline.NewModeFilter(u.repo), // Step 1: Filter D10/D8/D5 by Search Mode
+		pipeline.NewKalakiniFilter(),   // Step 2: Day of Birth Kalakini Safety Filter (100% Kalakini Free)
+		pipeline.NewScoringFilter(),    // Step Final: Scoring & Top 100 Ranking
 	)
 
 	if err := pipe.Execute(pCtx); err != nil {
@@ -55,6 +60,10 @@ func (u *nameSearchUseCase) GetAllNumbersMap(ctx context.Context) (map[int]domai
 
 func (u *nameSearchUseCase) GetSumsByTHName(ctx context.Context, thname string) (int, int, string, error) {
 	return u.repo.GetSumsByTHName(ctx, thname)
+}
+
+func (u *nameSearchUseCase) GetSumsForText(ctx context.Context, text string) (int, int, error) {
+	return u.repo.GetSurnameSums(ctx, text)
 }
 
 func (u *nameSearchUseCase) GetSampleNames(ctx context.Context) ([]domain.Celebrity, error) {
