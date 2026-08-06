@@ -1,0 +1,278 @@
+package com.miracle.names.ui.results
+
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.filled.ChevronRight
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.*
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.miracle.names.data.model.NameResultItem
+import com.miracle.names.ui.theme.*
+import com.miracle.names.viewmodel.NameSearchViewModel
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun NameResultsScreen(
+    results: List<NameResultItem>,
+    mode: String,
+    viewModel: NameSearchViewModel
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(MaterialTheme.colorScheme.background)
+    ) {
+        // Top App Bar
+        SmallTopAppBar(
+            title = {
+                Text(
+                    text = "🏆 ผลจัดอันดับ 100 ชื่อมงคล",
+                    color = Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 18.sp
+                )
+            },
+            navigationIcon = {
+                IconButton(onClick = { viewModel.resetToForm() }) {
+                    Icon(
+                        imageVector = Icons.Default.ArrowBack,
+                        contentDescription = "ย้อนกลับ",
+                        tint = Color.White
+                    )
+                }
+            },
+            colors = TopAppBarDefaults.smallTopAppBarColors(containerColor = PurpleHeader)
+        )
+
+        // Sub-header summary info
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            colors = CardDefaults.cardColors(containerColor = CardBgDark)
+        ) {
+            Column(
+                modifier = Modifier.padding(12.dp),
+                verticalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "📌 โหมด: ${if (mode == "combined") "รวมชื่อ+นามสกุล" else "เฉพาะชื่อตัว"}",
+                    color = GoldLight,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.Bold
+                )
+                val displayWish = if (viewModel.selectedWish.value.isNotEmpty()) viewModel.selectedWish.value else viewModel.prototypeName.value
+                if (displayWish.isNotEmpty()) {
+                    Text(
+                        text = "💬 AI Wish: $displayWish",
+                        color = Color.White,
+                        fontSize = 12.sp
+                    )
+                }
+
+                val semWeightPercent = (viewModel.semanticWeight.value * 100).toInt()
+                val numWeightPercent = 100 - semWeightPercent
+                Text(
+                    text = "⚖️ สัดส่วนน้ำหนัก: ⭐ เลขศาสตร์ ${numWeightPercent}%   🎯 ความหมาย ${semWeightPercent}%",
+                    color = GoldLight.copy(alpha = 0.9f),
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Medium
+                )
+            }
+        }
+
+        // List of 100 auspicious name cards
+        LazyColumn(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(horizontal = 12.dp),
+            verticalArrangement = Arrangement.spacedBy(8.dp),
+            contentPadding = PaddingValues(bottom = 24.dp)
+        ) {
+            itemsIndexed(results) { index, item ->
+                NameItemCard(
+                    rank = index + 1,
+                    item = item,
+                    onClick = { viewModel.selectNameForBlessingCard(item) }
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun NameItemCard(
+    rank: Int,
+    item: NameResultItem,
+    onClick: () -> Unit
+) {
+    Card(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable { onClick() },
+        shape = RoundedCornerShape(12.dp),
+        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+    ) {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            // Rank Badge
+            Box(
+                modifier = Modifier
+                    .size(38.dp)
+                    .clip(RoundedCornerShape(19.dp))
+                    .background(if (rank <= 3) GoldPrimary else PurpleHeader),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = "#$rank",
+                    color = if (rank <= 3) Color.Black else Color.White,
+                    fontWeight = FontWeight.Bold,
+                    fontSize = 13.sp
+                )
+            }
+
+            Spacer(modifier = Modifier.width(12.dp))
+
+            // Main Content Area
+            Column(modifier = Modifier.weight(1f)) {
+                // Top Row: Full Name + Star Badge + Score Badge
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier = Modifier.weight(1f, fill = false)
+                    ) {
+                        Text(
+                            text = item.thName,
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 20.sp,
+                            color = TextPrimary
+                        )
+                        if (item.isPerfectCombined) {
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Icon(
+                                imageVector = Icons.Default.Star,
+                                contentDescription = "มงคลสมบูรณ์แบบ",
+                                tint = GoldPrimary,
+                                modifier = Modifier.size(18.dp)
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.width(8.dp))
+
+                    Surface(
+                        color = PurpleAccent.copy(alpha = 0.12f),
+                        shape = RoundedCornerShape(12.dp)
+                    ) {
+                        Text(
+                            text = "🏆 Score: ${String.format("%.1f", item.finalScore)}",
+                            fontWeight = FontWeight.Bold,
+                            fontSize = 12.sp,
+                            color = PurpleAccent,
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(4.dp))
+
+                // Meaning Text
+                Text(
+                    text = item.meaning,
+                    fontSize = 13.sp,
+                    color = TextSecondary,
+                    maxLines = 1,
+                    overflow = androidx.compose.ui.text.style.TextOverflow.Ellipsis
+                )
+
+                Spacer(modifier = Modifier.height(8.dp))
+
+                // Bottom Row: Badges (PairCircles)
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    if (item.satPairsDisplay.isNotEmpty()) {
+                        PairCircles(pairsStr = item.satPairsDisplay, typesStr = item.satPairType)
+                    }
+                    if (item.shaSum > 0 && item.shaPairsDisplay.isNotEmpty()) {
+                        Spacer(modifier = Modifier.width(4.dp))
+                        PairCircles(pairsStr = item.shaPairsDisplay, typesStr = item.shaPairType)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.width(4.dp))
+
+            Icon(
+                imageVector = Icons.Default.ChevronRight,
+                contentDescription = "ดูการ์ดมงคล",
+                tint = Color.Gray
+            )
+        }
+    }
+}
+
+
+@Composable
+fun PairCircles(pairsStr: String, typesStr: String) {
+    val pairs = pairsStr.split(Regex("[/,]")).map { it.trim() }.filter { it.isNotEmpty() }
+    val types = typesStr.split(Regex("[/,]")).map { it.trim() }.filter { it.isNotEmpty() }
+
+    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        pairs.forEachIndexed { index, pair ->
+            val type = types.getOrNull(index) ?: ""
+            val bgColor = when {
+                type.contains("D10") -> Color(0xFF1B5E20) // Dark Green
+                type.contains("D8") || type == "D" -> Color(0xFF4CAF50) // Green (default for D)
+                type.contains("D5") -> Color(0xFF81C784) // Light Green
+                type.contains("R10") -> Color(0xFFE57373) // Light Red
+                type.contains("R7") || type == "R" -> Color(0xFFF44336) // Red (default for R)
+                type.contains("R5") -> Color(0xFFB71C1C) // Dark Red
+                type.contains("B") -> Color(0xFFB71C1C) // Dark Red (Bad)
+                else -> Color.Gray
+            }
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(androidx.compose.foundation.shape.CircleShape)
+                    .background(bgColor),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = pair,
+                    color = Color.White,
+                    fontSize = 12.sp,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+        }
+    }
+}

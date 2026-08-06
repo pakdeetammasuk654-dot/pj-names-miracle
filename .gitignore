@@ -1,0 +1,22 @@
+# macOS and editor state
+.DS_Store
+.idea/
+.vscode/
+
+# Android / Gradle local state and build outputs
+android-frontend/.gradle/
+android-frontend/build/
+android-frontend/app/build/
+android-frontend/local.properties
+*.apk
+*.aab
+
+# Go local configuration and generated artifacts
+go-backend/.env
+go-backend/bin/
+go-backend/names.db
+*.test
+*.out
+
+# Local logs
+*.log
