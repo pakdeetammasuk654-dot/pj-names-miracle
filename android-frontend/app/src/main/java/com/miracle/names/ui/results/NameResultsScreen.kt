@@ -1,7 +1,6 @@
 package com.miracle.names.ui.results
 
 import androidx.compose.foundation.background
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -98,7 +97,6 @@ fun NameResultsScreen(
             }
         }
 
-        // Curated recommendations first, followed by the complete ranked list.
         LazyColumn(
             modifier = Modifier
                 .fillMaxSize()
@@ -106,60 +104,13 @@ fun NameResultsScreen(
             verticalArrangement = Arrangement.spacedBy(8.dp),
             contentPadding = PaddingValues(bottom = 24.dp)
         ) {
-            if (results.isNotEmpty()) {
-                item {
-                    RecommendationHeader()
-                }
-            }
-            itemsIndexed(results.take(5)) { index, item ->
+            itemsIndexed(results) { index, item ->
                 NameItemCard(
                     rank = index + 1,
                     item = item,
-                    isFeatured = true,
                     onClick = { viewModel.selectNameForBlessingCard(item) }
                 )
             }
-            if (results.size > 5) {
-                item {
-                    Text(
-                        text = "รายชื่อทั้งหมด",
-                        color = GoldLight,
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 15.sp,
-                        modifier = Modifier.padding(top = 12.dp, bottom = 2.dp)
-                    )
-                }
-            }
-            itemsIndexed(results.drop(5)) { index, item ->
-                NameItemCard(
-                    rank = index + 6,
-                    item = item,
-                    onClick = { viewModel.selectNameForBlessingCard(item) }
-                )
-            }
-        }
-    }
-}
-
-@Composable
-private fun RecommendationHeader() {
-    Card(
-        colors = CardDefaults.cardColors(containerColor = GoldPrimary.copy(alpha = 0.16f)),
-        shape = RoundedCornerShape(12.dp)
-    ) {
-        Column(modifier = Modifier.padding(12.dp)) {
-            Text(
-                text = "✨ 5 ชื่อที่น่าเลือกสำหรับคุณ",
-                color = GoldLight,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
-            )
-            Spacer(modifier = Modifier.height(3.dp))
-            Text(
-                text = "คัดจากคะแนนสมดุลและเหตุผลที่ตรวจสอบได้",
-                color = Color.White,
-                fontSize = 12.sp
-            )
         }
     }
 }
@@ -168,16 +119,11 @@ private fun RecommendationHeader() {
 fun NameItemCard(
     rank: Int,
     item: NameResultItem,
-    isFeatured: Boolean = false,
     onClick: () -> Unit
 ) {
     val surfaceColor = MaterialTheme.colorScheme.surface
     val isDarkSurface = surfaceColor.luminance() < 0.5f
-    val cardContainerColor = when {
-        isFeatured && isDarkSurface -> Color(0xFF33233D)
-        isFeatured -> GoldPrimary.copy(alpha = 0.08f)
-        else -> surfaceColor
-    }
+    val cardContainerColor = surfaceColor
     val primaryTextColor = MaterialTheme.colorScheme.onSurface
     val secondaryTextColor = primaryTextColor.copy(alpha = if (isDarkSurface) 0.72f else 0.68f)
     val scoreBadgeColor = if (isDarkSurface) PurpleAccent.copy(alpha = 0.34f) else PurpleAccent.copy(alpha = 0.12f)
@@ -191,7 +137,7 @@ fun NameItemCard(
         colors = CardDefaults.cardColors(
             containerColor = cardContainerColor
         ),
-        border = if (isFeatured) BorderStroke(1.dp, GoldPrimary.copy(alpha = if (isDarkSurface) 0.42f else 0.32f)) else null,
+        border = null,
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
     ) {
         Row(
