@@ -6,10 +6,18 @@ import (
 	"log"
 	"os"
 
+	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
 )
 
 func InitDB() (*sql.DB, error) {
+	// Load local development variables when .env is present. Existing process
+	// environment variables take precedence, so deployment configuration is not
+	// overridden by a file.
+	if err := godotenv.Load(); err != nil && !os.IsNotExist(err) {
+		return nil, fmt.Errorf("failed to load .env: %w", err)
+	}
+
 	host, err := requiredEnv("DB_HOST")
 	if err != nil {
 		return nil, err

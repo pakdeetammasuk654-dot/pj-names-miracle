@@ -31,10 +31,10 @@ Android and Go application for auspicious Thai-name analysis. The product uses n
 2. Start the API:
 
    ```sh
-   ./run-local.sh
+   go run main.go
    ```
 
-   It listens on `http://localhost:8080`. The Android emulator uses `10.0.2.2` to reach this host.
+   The backend automatically loads a local `.env` when present. It listens on `http://localhost:8080`; the Android emulator uses `10.0.2.2` to reach this host.
 
 3. Build the Android app:
 

@@ -15,7 +15,7 @@
 
 ## Local development
 
-- Backend: `cd go-backend && ./run-local.sh`
+- Backend: `cd go-backend && go run main.go` (loads local `.env` automatically)
 - Backend verification: `cd go-backend && go test ./...`
 - Android verification: `cd android-frontend && ./gradlew :app:assembleDebug`
 - Android emulator points to `http://10.0.2.2:8080/`. Make endpoint configuration explicit before supporting physical devices or release builds.
