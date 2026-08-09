@@ -17,7 +17,7 @@ func NewKalakiniFilter() *KalakiniFilter {
 func (f *KalakiniFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayload]) error {
 	day := strings.ToLower(strings.TrimSpace(pCtx.Data.Request.DayOfBirth))
 	if day != "" {
-		log.Printf("[Pipeline Step 2: KalakiniFilter] Applied 100%% Kalakini safety filter for Day: %s", day)
+		log.Printf("[Pipeline Step 2: KalakiniFilter] Applied first-name Kalakini filter for Day: %s", day)
 	} else {
 		log.Printf("[Pipeline Step 2: KalakiniFilter] DayOfBirth not specified, skipping Kalakini filter")
 	}

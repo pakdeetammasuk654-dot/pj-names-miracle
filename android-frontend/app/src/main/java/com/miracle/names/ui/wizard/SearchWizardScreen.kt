@@ -4,13 +4,13 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.animateScrollBy
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.animation.AnimatedVisibility
 import coil.compose.AsyncImage
@@ -30,6 +30,7 @@ import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.RepeatMode
 import androidx.compose.ui.graphics.graphicsLayer
 import kotlinx.coroutines.delay
+import kotlin.math.roundToInt
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Book
@@ -42,6 +43,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.scale
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
@@ -53,9 +55,11 @@ import androidx.compose.ui.unit.sp
 import com.miracle.names.ui.theme.GoldPrimary
 import com.miracle.names.ui.theme.GoldLight
 import com.miracle.names.ui.theme.PurpleHeader
+import com.miracle.names.ui.theme.PurpleDark
 import com.miracle.names.ui.theme.TextSecondary
 import com.miracle.names.ui.theme.CardBgDark
 import com.miracle.names.ui.results.PairCircles
+import com.miracle.names.ui.components.TriangularWeightSelector
 import androidx.compose.foundation.shape.CircleShape
 import com.miracle.names.viewmodel.NameSearchViewModel
 
@@ -79,7 +83,7 @@ fun ModeSegmentedControl(
         ) {
             val options = listOf(
                 "standalone" to ("👤" to "เฉพาะชื่อตัว"),
-                "combined" to ("📜" to "รวมชื่อ + นามสกุล")
+                "combined" to ("📜" to "หาชื่อ + สกุล")
             )
 
             options.forEach { (modeKey, info) ->
@@ -134,16 +138,20 @@ fun ModeSegmentedControl(
 @Composable
 fun SearchWizardScreen(viewModel: NameSearchViewModel) {
     val searchMode by viewModel.searchMode.collectAsState()
+    val isFindSurnameMode by viewModel.isFindSurnameMode.collectAsState()
     val surname by viewModel.surname.collectAsState()
     val dayOfBirth by viewModel.dayOfBirth.collectAsState()
     val prototypeName by viewModel.prototypeName.collectAsState()
     val selectedWish by viewModel.selectedWish.collectAsState()
-    val semanticWeight by viewModel.semanticWeight.collectAsState()
+    val pendingWeights by viewModel.pendingRankingWeights.collectAsState()
     val celebrities by viewModel.celebrities.collectAsState()
     val decodedPairs by viewModel.decodedPairs.collectAsState()
     val decodedPairTypes by viewModel.decodedPairTypes.collectAsState()
+    val decodedPairIsGood by viewModel.decodedPairIsGood.collectAsState()
     val decodedMeaning by viewModel.decodedMeaning.collectAsState()
     val isDecodedFromDb by viewModel.isDecodedFromDb.collectAsState()
+    val isDecodingName by viewModel.isDecodingName.collectAsState()
+    val decodeError by viewModel.decodeError.collectAsState()
 
     val scrollState = rememberScrollState()
     val listState = androidx.compose.foundation.lazy.rememberLazyListState()
@@ -202,20 +210,13 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                 .padding(vertical = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-        
+
             // ----------------------------------------------------
             // Celebrity Avatars (Famous Names) - Marquee
             // ----------------------------------------------------
             if (searchMode == "standalone") {
                 if (celebrities.isNotEmpty()) {
-                    Text(
-                    text = "💡 ลองเลือกชื่อคนดัง (Celebrity Avatars):",
-                    fontSize = 12.sp,
-                    color = TextSecondary,
-                    modifier = Modifier.padding(horizontal = 16.dp)
-                )
-                
-                val avatarColors = listOf(
+                    val avatarColors = listOf(
                     Color(0xFFE57373), Color(0xFF81C784), Color(0xFF64B5F6), Color(0xFFFFB74D), Color(0xFFBA68C8)
                 )
 
@@ -232,15 +233,15 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                         val isSelected = prototypeName == name
                         val initial = name.first().toString()
                         val bgColor = avatarColors[index % avatarColors.size]
-                        
+
                         Column(
                             horizontalAlignment = Alignment.CenterHorizontally,
                             modifier = Modifier
                                 .width(70.dp)
                                 .padding(vertical = 4.dp)
-                                .clickable { 
+                                .clickable {
                                     isAutoScrolling = false
-                                    viewModel.prototypeName.value = name 
+                                    viewModel.prototypeName.value = name
                                     viewModel.decodeCurrentName(name)
                                 }
                         ) {
@@ -329,13 +330,17 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                 ) {
                         OutlinedTextField(
                             value = prototypeName,
-                            onValueChange = { 
-                                viewModel.prototypeName.value = it 
+                            onValueChange = {
+                                viewModel.prototypeName.value = it
                                 viewModel.decodeCurrentName(it)
                             },
-                            label = { Text("กรอกชื่อต้นแบบที่ต้องการค้นหา") },
+                            label = { Text("พิมพ์ชื่อต้นแบบเพื่อวิเคราะห์อ้างอิง") },
                             modifier = Modifier.fillMaxWidth(),
                             singleLine = true,
+                            isError = decodeError != null,
+                            supportingText = decodeError?.let { message ->
+                                { Text(text = message, fontSize = 11.sp) }
+                            },
                             colors = OutlinedTextFieldDefaults.colors(
                                 focusedBorderColor = GoldPrimary,
                                 unfocusedBorderColor = Color.Gray,
@@ -343,9 +348,15 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                                 unfocusedTextColor = MaterialTheme.colorScheme.onSurface
                             ),
                             trailingIcon = {
-                                if (prototypeName.isNotEmpty()) {
-                                    IconButton(onClick = { 
-                                        viewModel.prototypeName.value = "" 
+                                if (isDecodingName) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = GoldPrimary
+                                    )
+                                } else if (prototypeName.isNotEmpty()) {
+                                    IconButton(onClick = {
+                                        viewModel.prototypeName.value = ""
                                         viewModel.decodeCurrentName("")
                                     }) {
                                         Icon(imageVector = Icons.Default.Clear, contentDescription = "ล้างข้อความ")
@@ -362,51 +373,54 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                             enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
                             exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
                         ) {
-                            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                                AnimatedVisibility(
-                                    visible = isDecodedFromDb && decodedMeaning.isNotBlank(),
-                                    enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
-                                    exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                            val isDarkTheme = isSystemInDarkTheme()
+                            Surface(
+                                shape = RoundedCornerShape(12.dp),
+                                color = if (isDarkTheme) Color(0xFF143324) else Color(0xFFE8F5E9),
+                                border = BorderStroke(1.dp, if (isDarkTheme) Color(0xFF2E7D32) else Color(0xFFA5D6A7)),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    // Show DB meaning (read-only)
-                                    Surface(
-                                        shape = RoundedCornerShape(8.dp),
-                                        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.3f),
-                                        border = BorderStroke(1.dp, GoldPrimary.copy(alpha = 0.3f)),
-                                        modifier = Modifier.fillMaxWidth()
-                                    ) {
-                                        Column(modifier = Modifier.padding(10.dp)) {
-                                            Text(
-                                                text = "💡 ความหมายของชื่อต้นแบบ:",
-                                                fontSize = 12.sp,
-                                                fontWeight = FontWeight.Bold,
-                                                color = GoldPrimary
-                                            )
-                                            Spacer(modifier = Modifier.height(2.dp))
-                                            Text(
-                                                text = decodedMeaning,
-                                                fontSize = 13.sp,
-                                                color = MaterialTheme.colorScheme.onSurface,
-                                                lineHeight = 18.sp
-                                            )
-                                        }
+                                    if (isDecodedFromDb && decodedMeaning.isNotBlank()) {
+                                        Text(
+                                            text = "💡 ความหมายของชื่อต้นแบบ:",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = if (isDarkTheme) Color(0xFF81C784) else Color(0xFF2E7D32)
+                                        )
+                                        Text(
+                                            text = decodedMeaning,
+                                            fontSize = 13.sp,
+                                            color = if (isDarkTheme) Color(0xFFF1F8E9) else Color(0xFF1B4332),
+                                            lineHeight = 18.sp
+                                        )
+                                        HorizontalDivider(
+                                            color = if (isDarkTheme) Color(0xFF2E7D32).copy(alpha = 0.5f) else Color(0xFFA5D6A7).copy(alpha = 0.6f),
+                                            thickness = 0.5.dp
+                                        )
                                     }
-                                }
-    
-                                Row(
-                                    modifier = Modifier.fillMaxWidth(),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Text(
-                                        text = "คู่เลข:",
-                                        fontSize = 12.sp,
-                                        color = TextSecondary,
-                                        modifier = Modifier.padding(end = 6.dp)
-                                    )
-                                    PairCircles(
-                                        pairsStr = decodedPairs.joinToString(","),
-                                        typesStr = decodedPairTypes.joinToString(",")
-                                    )
+
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = "คู่เลขศาสตร์ และพลังเงา:",
+                                            fontSize = 12.sp,
+                                            fontWeight = FontWeight.Medium,
+                                            color = if (isDarkTheme) Color(0xFF81C784) else Color(0xFF2E7D32),
+                                            modifier = Modifier.padding(end = 6.dp)
+                                        )
+                                        PairCircles(
+                                            pairsStr = decodedPairs.joinToString(","),
+                                            typesStr = decodedPairTypes.joinToString(","),
+                                            goodFlags = decodedPairIsGood,
+                                            onPairClick = { pair -> viewModel.fetchPairDetail(pair) }
+                                        )
+                                    }
                                 }
                             }
                         }
@@ -416,7 +430,7 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
 
                 ModeSegmentedControl(
                     selectedMode = searchMode,
-                    onModeSelected = { viewModel.searchMode.value = it }
+                    onModeSelected = viewModel::updateSearchMode
                 )
 
                 // If combined mode, show Surname field
@@ -425,13 +439,103 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                     enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
                     exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
                 ) {
-                    OutlinedTextField(
-                        value = surname,
-                        onValueChange = { viewModel.surname.value = it },
-                        label = { Text("กรอกนามสกุล (เช่น สมบูรณ์)") },
+                    Column(
                         modifier = Modifier.fillMaxWidth(),
-                        singleLine = true
-                    )
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 4.dp, vertical = 0.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.End
+                        ) {
+                            Text(
+                                text = "เปลี่ยนเป็น [หานามสกุล] + ชื่อ",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.85f)
+                            )
+                            Spacer(modifier = Modifier.width(2.dp))
+                            Box(
+                                modifier = Modifier
+                                    .requiredHeight(22.dp)
+                                    .requiredWidth(38.dp),
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Switch(
+                                    checked = isFindSurnameMode,
+                                    onCheckedChange = { viewModel.isFindSurnameMode.value = it },
+                                    colors = SwitchDefaults.colors(
+                                        checkedThumbColor = GoldPrimary,
+                                        checkedTrackColor = GoldPrimary.copy(alpha = 0.5f)
+                                    ),
+                                    modifier = Modifier.scale(0.55f)
+                                )
+                            }
+                        }
+
+                        OutlinedTextField(
+                            value = surname,
+                            onValueChange = {
+                                viewModel.surname.value = it
+                                viewModel.decodeCurrentName(it)
+                            },
+                            label = { Text(if (isFindSurnameMode) "กรอกชื่อตัว (เช่น ทอง)" else "กรอกนามสกุล (เช่น สมบูรณ์)") },
+                            modifier = Modifier.fillMaxWidth(),
+                            singleLine = true,
+                            isError = decodeError != null,
+                            supportingText = decodeError?.let { message ->
+                                { Text(text = message, fontSize = 11.sp) }
+                            },
+                            colors = OutlinedTextFieldDefaults.colors(
+                                focusedBorderColor = GoldPrimary,
+                                unfocusedBorderColor = Color.Gray,
+                                focusedTextColor = MaterialTheme.colorScheme.onSurface,
+                                unfocusedTextColor = MaterialTheme.colorScheme.onSurface
+                            ),
+                            trailingIcon = {
+                                if (isDecodingName) {
+                                    CircularProgressIndicator(
+                                        modifier = Modifier.size(18.dp),
+                                        strokeWidth = 2.dp,
+                                        color = GoldPrimary
+                                    )
+                                } else if (surname.isNotEmpty()) {
+                                    IconButton(onClick = {
+                                        viewModel.surname.value = ""
+                                        viewModel.decodeCurrentName("")
+                                    }) {
+                                        Icon(imageVector = Icons.Default.Clear, contentDescription = "ล้างข้อความ")
+                                    }
+                                }
+                            }
+                        )
+
+                        AnimatedVisibility(
+                            visible = surname.isNotBlank() && decodedPairs.isNotEmpty(),
+                            enter = androidx.compose.animation.expandVertically() + androidx.compose.animation.fadeIn(),
+                            exit = androidx.compose.animation.shrinkVertically() + androidx.compose.animation.fadeOut()
+                        ) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Text(
+                                    text = "คู่นามสกุล:",
+                                    fontSize = 12.sp,
+                                    color = TextSecondary,
+                                    modifier = Modifier.padding(end = 6.dp)
+                                )
+                                PairCircles(
+                                    pairsStr = decodedPairs.joinToString(","),
+                                    typesStr = decodedPairTypes.joinToString(","),
+                                    goodFlags = decodedPairIsGood,
+                                    onPairClick = { pair -> viewModel.fetchPairDetail(pair) }
+                                )
+                            }
+                        }
+                    }
                 }
 
                 // Day of Birth Selector (Dropdown)
@@ -472,7 +576,7 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                     ) {
                         daysList.forEach { (key, name) ->
                             DropdownMenuItem(
-                                text = { 
+                                text = {
                                     Text(
                                         text = name,
                                         fontWeight = if (dayOfBirth == key) FontWeight.Bold else FontWeight.Normal,
@@ -490,7 +594,7 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
 
 
             }
-            
+
             Spacer(modifier = Modifier.height(8.dp))
 
             // Randomized & Animated Preset Quick Selection Chips - Classic Compact Rows
@@ -508,13 +612,13 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                     "🔥 ดวงปังดวงเฮง ค้าขายรวยมั่งคั่ง"
                 )
             }
-            var currentWishList by remember { 
-                mutableStateOf(listOf("🌸 เสริมดวงมงคลรอบด้าน (ทุกมิติชีวิต)") + wishPool.drop(1).shuffled().take(3)) 
+            var currentWishList by remember {
+                mutableStateOf(listOf("🌸 เสริมดวงมงคลรอบด้าน (ทุกมิติชีวิต)") + wishPool.drop(1).shuffled().take(3))
             }
             var wishAnimKey by remember { mutableIntStateOf(0) }
 
             val dbMeaningVirtualWish = if (decodedMeaning.isNotBlank()) "💡 $decodedMeaning" else "💡 ความหมายจากชื่อต้นแบบ"
-            
+
             LaunchedEffect(selectedWish, isDecodedFromDb, decodedMeaning) {
                 val pinnedItems = mutableListOf<String>()
                 if (selectedWish.isNotEmpty() && wishPool.contains(selectedWish)) {
@@ -523,7 +627,7 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                 if (isDecodedFromDb) {
                     pinnedItems.add(dbMeaningVirtualWish)
                 }
-                
+
                 // Instant update: Only update if pinned items aren't already at the top in the correct order
                 val currentPinned = currentWishList.take(pinnedItems.size)
                 if (currentPinned != pinnedItems) {
@@ -531,7 +635,7 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                     currentWishList = pinnedItems + remaining.shuffled().take(4 - pinnedItems.size)
                     wishAnimKey++
                 }
-                
+
                 // Auto-refresh timer: shuffle remaining items every 9 seconds
                 while (true) {
                     delay(9000L)
@@ -561,7 +665,7 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                         if (isDecodedFromDb) {
                             pinnedItems.add(dbMeaningVirtualWish)
                         }
-                        
+
                         val remaining = wishPool.filter { it !in pinnedItems }
                         currentWishList = pinnedItems + remaining.shuffled().take(4 - pinnedItems.size)
                         wishAnimKey++
@@ -576,10 +680,12 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                     )
                 }
             }
-            
+
 
             Card(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
                 colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.65f)),
                 shape = RoundedCornerShape(14.dp),
                 border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f))
@@ -605,15 +711,35 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                                 label = "alpha"
                             )
 
+                            val selected = (wish == dbMeaningVirtualWish && isDecodedFromDb && selectedWish.isEmpty()) || selectedWish == wish
+
                             Box(
                                 modifier = Modifier
                                     .fillMaxWidth()
                                     .graphicsLayer {
-                                        translationX = offsetX
-                                        alpha = itemAlpha
+                                        translationX = if (selected) 0f else offsetX
+                                        alpha = if (selected) 1f else itemAlpha
                                     }
                             ) {
-                                val selected = (wish == dbMeaningVirtualWish && isDecodedFromDb && selectedWish.isEmpty()) || selectedWish == wish
+                                val isDarkTheme = isSystemInDarkTheme()
+                                val selectedBackground = if (isDarkTheme) {
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            PurpleHeader.copy(alpha = 0.96f),
+                                            GoldPrimary.copy(alpha = 0.30f),
+                                            PurpleHeader.copy(alpha = 0.96f)
+                                        )
+                                    )
+                                } else {
+                                    Brush.horizontalGradient(
+                                        colors = listOf(
+                                            Color(0xFFFFF8DE),
+                                            Color(0xFFFFEAA3),
+                                            Color(0xFFFFF8DE)
+                                        )
+                                    )
+                                }
+                                val selectedTextColor = if (isDarkTheme) GoldLight else PurpleHeader
                                 Column(modifier = Modifier.fillMaxWidth()) {
                                     if (index > 0) {
                                         HorizontalDivider(
@@ -639,17 +765,29 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                                                 }
                                                 // The LaunchedEffect will handle the reordering automatically!
                                             }
-                                            .background(if (selected) GoldPrimary.copy(alpha = 0.2f) else Color.Transparent)
-                                            .padding(horizontal = 10.dp, vertical = 6.dp),
+                                            .then(
+                                                if (selected) {
+                                                    Modifier
+                                                        .background(selectedBackground)
+                                                        .border(
+                                                            width = 1.dp,
+                                                            color = GoldPrimary.copy(alpha = if (isDarkTheme) 0.72f else 0.48f)
+                                                        )
+                                                } else {
+                                                    Modifier.background(Color.Transparent)
+                                                }
+                                            )
+                                            .padding(horizontal = 14.dp, vertical = 8.dp),
                                         verticalAlignment = Alignment.CenterVertically
                                     ) {
                                         Text(
                                             text = wish,
                                             fontSize = 12.sp,
                                             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal,
-                                            color = if (selected) GoldPrimary else MaterialTheme.colorScheme.onSurface,
+                                            color = if (selected) selectedTextColor else MaterialTheme.colorScheme.onSurface,
                                             modifier = Modifier.weight(1f),
-                                            maxLines = 1
+                                            maxLines = 3,
+                                            lineHeight = 18.sp
                                         )
                                         if (selected) {
                                             Text(
@@ -665,45 +803,92 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                         }
                     }
                 }
+            }
 
-            // Slider for Weight in a clean Card below
+            // One ternary control replaces multiple presets and sliders (Magical Design).
             Card(
-                modifier = Modifier.fillMaxWidth(),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.75f)),
-                shape = RoundedCornerShape(14.dp),
-                border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.8f))
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp),
+                shape = RoundedCornerShape(18.dp),
+                colors = CardDefaults.cardColors(containerColor = PurpleHeader),
+                border = BorderStroke(
+                    1.5.dp,
+                    Brush.horizontalGradient(
+                        listOf(
+                            GoldPrimary,
+                            Color(0xFFF472B6),
+                            Color(0xFFA855F7),
+                            GoldPrimary
+                        )
+                    )
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
             ) {
-                Column(modifier = Modifier.padding(12.dp)) {
-                    Text(
-                        text = "⚖️ น้ำหนักการจัดอันดับ (Ranking Weight)",
-                        style = MaterialTheme.typography.bodyMedium,
-                        fontWeight = FontWeight.Bold
-                    )
-                    Spacer(modifier = Modifier.height(4.dp))
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    PurpleDark,
+                                    PurpleHeader,
+                                    Color(0xFF4C1D95)
+                                )
+                            )
+                        )
+                        .padding(14.dp)
+                ) {
+                    Column {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = "⚖️",
+                                fontSize = 16.sp
+                            )
+                            Spacer(modifier = Modifier.width(6.dp))
+                            Text(
+                                text = "สูตรการจัดอันดับ",
+                                color = Color.White,
+                                fontSize = 15.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                        Text(
+                            text = "ลากดวงประกายไปหาด้านที่คุณให้ความสำคัญ",
+                            fontSize = 11.sp,
+                            color = GoldLight.copy(alpha = 0.85f),
+                            modifier = Modifier.padding(top = 2.dp, bottom = 6.dp)
+                        )
 
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween
-                    ) {
-                        Text(text = "เน้นเลขศาสตร์", fontSize = 12.sp, color = TextSecondary)
-                        Text(text = "สมดุล", fontSize = 12.sp, color = TextSecondary)
-                        Text(text = "เน้นความหมาย", fontSize = 12.sp, color = TextSecondary)
+                        val numerologyPercent = (pendingWeights.numerology * 100).roundToInt()
+                        val semanticPercent = (pendingWeights.semantic * 100).roundToInt()
+                        val soundPercent = 100 - numerologyPercent - semanticPercent
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(top = 6.dp),
+                            horizontalArrangement = Arrangement.spacedBy(10.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            WizardWeightPercentStack(
+                                numerologyPercent = numerologyPercent,
+                                semanticPercent = semanticPercent,
+                                soundPercent = soundPercent,
+                                modifier = Modifier.width(140.dp)
+                            )
+                            TriangularWeightSelector(
+                                numerologyWeight = pendingWeights.numerology,
+                                semanticWeight = pendingWeights.semantic,
+                                soundWeight = pendingWeights.sound,
+                                onWeightsChanged = viewModel::updateRankingWeights,
+                                modifier = Modifier.weight(1f),
+                                compact = true,
+                                labelColor = Color.White.copy(alpha = 0.85f),
+                                showLabels = false,
+                                showCornerIcons = true
+                            )
+                        }
                     }
-                    Slider(
-                        value = semanticWeight,
-                        onValueChange = { viewModel.semanticWeight.value = it },
-                        valueRange = 0f..1f,
-                        steps = 9,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                    val weightPercent = (semanticWeight * 100).toInt()
-                    Text(
-                        text = "ความหมาย: ${weightPercent}%, เลขศาสตร์: ${100 - weightPercent}%",
-                        fontSize = 12.sp,
-                        color = GoldPrimary,
-                        modifier = Modifier.align(Alignment.CenterHorizontally),
-                        fontWeight = FontWeight.Bold
-                    )
                 }
             }
 
@@ -746,13 +931,13 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
 
             val isFormValid = when (searchMode) {
                 "standalone" -> dayOfBirth.isNotEmpty() && hasMeaningSelection
-                "combined" -> dayOfBirth.isNotEmpty() && surname.isNotEmpty() && hasMeaningSelection
+                "combined" -> dayOfBirth.isNotEmpty() && surname.isNotBlank() && hasMeaningSelection
                 else -> false
             }
 
             val buttonText = when {
                 dayOfBirth.isEmpty() -> "⚠️ โปรดเลือกวันเกิด"
-                searchMode == "combined" && surname.isEmpty() -> "⚠️ โปรดกรอกนามสกุล"
+                searchMode == "combined" && surname.isBlank() -> if (isFindSurnameMode) "⚠️ โปรดกรอกชื่อตัว" else "⚠️ โปรดกรอกนามสกุล"
                 !hasMeaningSelection -> "⚠️ โปรดเลือกความหมาย"
                 else -> "จัดอันดับชื่อดีตามตำรา"
             }
@@ -840,8 +1025,16 @@ fun SearchWizardScreen(viewModel: NameSearchViewModel) {
                 }
             }
             Spacer(modifier = Modifier.height(28.dp))
-            }
         }
+
+        val selectedPairDetail by viewModel.selectedPairDetail.collectAsState()
+        val isPairDetailLoading by viewModel.isPairDetailLoading.collectAsState()
+
+        com.miracle.names.ui.components.PairDetailSheet(
+            pairDetail = selectedPairDetail,
+            isLoading = isPairDetailLoading,
+            onDismiss = viewModel::dismissPairDetail
+        )
     }
 }
 
@@ -870,6 +1063,76 @@ fun SelectableChip(
             color = if (selected) Color.Black else MaterialTheme.colorScheme.onSurface,
             fontSize = 13.sp,
             fontWeight = if (selected) FontWeight.Bold else FontWeight.Normal
+        )
+    }
+}
+
+@Composable
+private fun WizardWeightPercentStack(
+    numerologyPercent: Int,
+    semanticPercent: Int,
+    soundPercent: Int,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier,
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        WizardWeightPercentLine(
+            icon = "⭐",
+            label = "เลขศาสตร์",
+            percent = numerologyPercent,
+            accentColor = Color(0xFFFDE047)
+        )
+        WizardWeightPercentLine(
+            icon = "🎯",
+            label = "ความหมาย",
+            percent = semanticPercent,
+            accentColor = Color(0xFFF472B6)
+        )
+        WizardWeightPercentLine(
+            icon = "🎶",
+            label = "ไพเราะ",
+            percent = soundPercent,
+            accentColor = Color(0xFF38BDF8)
+        )
+    }
+}
+
+@Composable
+private fun WizardWeightPercentLine(
+    icon: String,
+    label: String,
+    percent: Int,
+    accentColor: Color
+) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Text(
+            text = icon,
+            fontSize = 11.5.sp,
+            maxLines = 1,
+            modifier = Modifier.width(16.dp)
+        )
+        Text(
+            text = label,
+            color = Color.White.copy(alpha = 0.95f),
+            fontSize = 11.5.sp,
+            fontWeight = FontWeight.Bold,
+            maxLines = 1,
+            softWrap = false,
+            modifier = Modifier.weight(1f)
+        )
+        Text(
+            text = "$percent%",
+            color = accentColor,
+            fontSize = 12.5.sp,
+            fontWeight = FontWeight.ExtraBold,
+            maxLines = 1,
+            modifier = Modifier.width(36.dp)
         )
     }
 }

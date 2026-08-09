@@ -2,6 +2,7 @@ package com.miracle.names.data.remote
 
 import com.miracle.names.data.model.NameSearchRequest
 import com.miracle.names.data.model.NameSearchResponse
+import com.miracle.names.data.model.NameRerankRequest
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Response
@@ -17,12 +18,18 @@ import retrofit2.http.GET
 interface ApiService {
     @POST("api/v1/names/search")
     suspend fun searchTopNames(@Body request: NameSearchRequest): Response<NameSearchResponse>
+
+    @POST("api/v1/names/rerank")
+    suspend fun rerankNames(@Body request: NameRerankRequest): Response<NameSearchResponse>
     
     @GET("api/v1/celebrities")
     suspend fun getCelebrities(): Response<CelebritiesResponse>
 
     @GET("api/v1/decode")
     suspend fun decodeName(@retrofit2.http.Query("name") name: String): Response<com.miracle.names.data.model.DecodeResponse>
+
+    @GET("api/v1/pair-detail")
+    suspend fun getPairDetail(@retrofit2.http.Query("number") pairNumber: String): Response<com.miracle.names.data.model.PairDetailResponse>
 }
 
 object RetrofitClient {
@@ -36,7 +43,8 @@ object RetrofitClient {
     private val okHttpClient = OkHttpClient.Builder()
         .addInterceptor(loggingInterceptor)
         .connectTimeout(15, TimeUnit.SECONDS)
-        .readTimeout(15, TimeUnit.SECONDS)
+        .readTimeout(60, TimeUnit.SECONDS)
+        .callTimeout(60, TimeUnit.SECONDS)
         .build()
 
     val apiService: ApiService by lazy {

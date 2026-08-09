@@ -10,7 +10,9 @@ type NumberMeaning struct {
 	MiracleDetail string `json:"miracledetail"` // Detail
 }
 
-// IsGood returns true if pairtype starts with 'D' (D10, D8, D5)
+// IsGood follows the domain grading: every D-type pair is auspicious. A D5 row
+// may still carry a low or negative point value, which lowers ranking score
+// without excluding the name from results.
 func (n NumberMeaning) IsGood() bool {
 	pairType := strings.ToUpper(strings.TrimSpace(n.PairType))
 	return strings.HasPrefix(pairType, "D")

@@ -2,17 +2,16 @@ package pipeline
 
 import (
 	"fmt"
+	"math"
 	"sort"
-	"strconv"
 	"strings"
+	"unicode/utf8"
 
 	"go-backend/domain"
 )
 
-// ScoringFilter ranks candidates using perfect numerology, hybrid score, and total score.
+// ScoringFilter ranks candidates using numerology, semantic relevance, and total score.
 type ScoringFilter struct{}
-
-const perfectNumerologyBonus = 8.0
 
 func NewScoringFilter() *ScoringFilter {
 	return &ScoringFilter{}
@@ -24,8 +23,79 @@ func (f *ScoringFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchP
 	maxPairPoint := getMaxPairPoint(goodMap)
 	var processed []domain.NameResultItem
 
+	requestedNumWeight, requestedSemWeight, requestedSoundWeight := resolveRankingWeights(payload.Request)
+	payload.RequestedWeights = domain.RankingWeights{
+		Numerology: requestedNumWeight,
+		Semantic:   requestedSemWeight,
+		Sound:      requestedSoundWeight,
+	}
+	semanticAvailable := false
+	semanticSource := "not_requested"
+	semanticQueryModel := ""
+	semanticVectorHash := ""
+	candidateVectorProvenanceVerified := false
+	candidateVectorProvenanceSource := "not_requested"
+	if strings.TrimSpace(payload.Request.WishQuery) != "" {
+		semanticSource = payload.SemanticCorpus.Source
+		if semanticSource == "" {
+			semanticSource = "unavailable"
+		}
+		candidateVectorProvenanceSource = payload.SemanticCorpus.Source
+		if payload.Request.IsNameIntent {
+			candidateVectorProvenanceSource = "not_applicable_trigram"
+		} else {
+			candidateVectorProvenanceVerified = payload.SemanticCorpus.Approved
+			if candidateVectorProvenanceSource == "" {
+				candidateVectorProvenanceSource = "unavailable_unapproved_vector_corpus"
+			}
+		}
+		semanticContractAllowsScoring := payload.Request.IsNameIntent || payload.SemanticCorpus.Approved
+		if semanticContractAllowsScoring {
+			for _, candidate := range payload.Candidates {
+				if semanticQueryModel == "" && candidate.SemanticQueryModel != "" {
+					semanticQueryModel = candidate.SemanticQueryModel
+					semanticVectorHash = candidate.SemanticVectorHash
+				}
+				if !semanticAvailable && candidate.SemanticSource != "" {
+					semanticSource = candidate.SemanticSource
+				}
+				if candidate.SemanticAvailable {
+					semanticAvailable = true
+					semanticSource = candidate.SemanticSource
+					semanticQueryModel = candidate.SemanticQueryModel
+					semanticVectorHash = candidate.SemanticVectorHash
+					break
+				}
+			}
+		}
+	}
+	numWeight, semWeight, soundWeight := requestedNumWeight, requestedSemWeight, requestedSoundWeight
+	if !semanticAvailable {
+		semWeight = 0
+		numWeight, soundWeight = normalizeTwoWeights(numWeight, soundWeight)
+	}
+	payload.AppliedWeights = domain.RankingWeights{
+		Numerology: numWeight,
+		Semantic:   semWeight,
+		Sound:      soundWeight,
+	}
+	payload.SemanticAvailable = semanticAvailable
+	payload.SemanticSource = semanticSource
+	payload.SemanticQueryModel = semanticQueryModel
+	payload.SemanticVectorHash = semanticVectorHash
+	payload.CandidateVectorProvenanceVerified = candidateVectorProvenanceVerified
+	payload.CandidateVectorProvenanceSource = candidateVectorProvenanceSource
+
 	for _, c := range payload.Candidates {
 		item := c
+
+		// Combined mode has a dual safety policy: the first name must be
+		// independently auspicious before the surname-adjusted totals are checked.
+		baseSatPairs := formatTotalValue(item.SatSum)
+		baseShaPairs := formatTotalValue(item.ShaSum)
+		if !allPairsAreGood(baseSatPairs, goodMap) || !allPairsAreGood(baseShaPairs, goodMap) {
+			continue
+		}
 
 		if payload.Request.Mode == domain.ModeCombined {
 			item.TotalSatSum = item.SatSum + payload.SurnameSatSum
@@ -55,50 +125,70 @@ func (f *ScoringFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchP
 		item.ShaMiracleDesc = shaDesc
 		item.TotalScore = satPoint + shaPoint
 
-		// Flag if both name and surname combined result in perfect D-type good numbers
-		if strings.HasPrefix(satType, "D") && strings.HasPrefix(shaType, "D") {
+		// This legacy flag is meaningful only in combined mode.
+		if payload.Request.Mode == domain.ModeCombined &&
+			strings.HasPrefix(satType, "D") && strings.HasPrefix(shaType, "D") {
 			item.IsPerfectCombined = true
 		}
 
-		// Normalize numerology and semantic quality to the same 0-100 scale
-		// before applying the user's weights.
-		var semWeight float64 = 0.5
-		if payload.Request.SemanticWeight != nil {
-			semWeight = clamp(*payload.Request.SemanticWeight, 0, 1)
-		}
-		numWeight := 1.0 - semWeight
-
 		pairCount := len(satPairs) + len(shaPairs)
-		numerologyRaw := normalizeNumerologyScore(item.TotalScore, pairCount, maxPairPoint)
+		numerologyRaw := roundRankingScore(normalizeNumerologyScore(item.TotalScore, pairCount, maxPairPoint))
 		semanticRaw := 0.0
-		if payload.Request.WishQuery != "" {
-			semanticRaw = clamp((1.0-item.VectorDistance)*100.0, 0, 100)
-		} else {
-			// No semantic intent means numerology owns the full score.
-			numWeight = 1.0
-			semWeight = 0.0
+		if semanticAvailable && item.SemanticAvailable {
+			semanticRaw = roundRankingScore(clamp((1.0-item.VectorDistance)*100.0, 0, 100))
 		}
+		soundRaw := calculateSoundScore(item.EuphonyScore, item.PronunciationEase, item.RhythmScore, item.THName)
+		soundCalibrated, calibrationSource := calibrateSoundScore(
+			soundRaw,
+			item.PhoneticVersion,
+			payload.SoundCalibration,
+		)
+		soundCalibrated = roundRankingScore(soundCalibrated)
 
 		item.NumerologyScore = numerologyRaw
 		item.SemanticScore = semanticRaw
-		item.FinalScore = (numerologyRaw * numWeight) + (semanticRaw * semWeight)
-		if item.IsPerfectCombined {
-			item.PerfectBonus = perfectNumerologyBonus
-			item.FinalScore = clamp(item.FinalScore+item.PerfectBonus, 0, 100)
+		item.SemanticAvailable = semanticAvailable && item.SemanticAvailable
+		item.SemanticModel = item.SemanticQueryModel
+		if !item.SemanticAvailable || item.SemanticSource == "" {
+			item.SemanticSource = semanticSource
 		}
-		item.RankingReasons = buildRankingReasons(item, payload.Request.DayOfBirth, payload.Request.WishQuery)
+		item.CandidateVectorProvenanceVerified = candidateVectorProvenanceVerified
+		item.CandidateVectorProvenanceSource = candidateVectorProvenanceSource
+		item.RawSoundScore = soundRaw
+		item.SoundScore = soundCalibrated
+		item.SoundScope = "first_name"
+		item.SoundCalibration = calibrationSource
+		item.FinalScore = roundRankingScore((numerologyRaw * numWeight) +
+			(semanticRaw * semWeight) +
+			(soundCalibrated * soundWeight))
+		item.RankingReasons = buildRankingReasons(
+			item,
+			payload.Request.DayOfBirth,
+			payload.Request.WishQuery,
+			semanticAvailable,
+		)
 
 		processed = append(processed, item)
 	}
 
-	// Transparent order: hybrid score (including a disclosed perfect-pair bonus),
-	// then raw numerology points, then name ID for stable ordering.
+	// Transparent order: the exact user-weighted score first. Equal primary
+	// scores are resolved by practical name quality; NameID is only the final
+	// technical fallback and never acts as a user-facing quality signal.
 	sort.Slice(processed, func(i, j int) bool {
 		if processed[i].FinalScore != processed[j].FinalScore {
 			return processed[i].FinalScore > processed[j].FinalScore
 		}
-		if processed[i].TotalScore != processed[j].TotalScore {
-			return processed[i].TotalScore > processed[j].TotalScore
+		if processed[i].SoundScore != processed[j].SoundScore {
+			return processed[i].SoundScore > processed[j].SoundScore
+		}
+		if numWeight > 0 && processed[i].NumerologyScore != processed[j].NumerologyScore {
+			return processed[i].NumerologyScore > processed[j].NumerologyScore
+		}
+		if semWeight > 0 && processed[i].SemanticScore != processed[j].SemanticScore {
+			return processed[i].SemanticScore > processed[j].SemanticScore
+		}
+		if processed[i].THName != processed[j].THName {
+			return processed[i].THName < processed[j].THName
 		}
 		return processed[i].NameID < processed[j].NameID
 	})
@@ -121,17 +211,16 @@ func (f *ScoringFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchP
 	return nil
 }
 
-func allPairsAreGood(pairs []string, numbers map[int]domain.NumberMeaning) bool {
+func allPairsAreGood(pairs []string, numbers map[string]domain.NumberMeaning) bool {
 	if len(pairs) == 0 {
 		return false
 	}
 
 	for _, pair := range pairs {
-		value, err := strconv.Atoi(pair)
-		if err != nil {
+		if len(pair) != 1 && len(pair) != 2 {
 			return false
 		}
-		meaning, ok := numbers[value]
+		meaning, ok := numbers[pair]
 		if !ok || !meaning.IsGood() {
 			return false
 		}
@@ -140,10 +229,10 @@ func allPairsAreGood(pairs []string, numbers map[int]domain.NumberMeaning) bool 
 	return true
 }
 
-func getMaxPairPoint(numbers map[int]domain.NumberMeaning) int {
+func getMaxPairPoint(numbers map[string]domain.NumberMeaning) int {
 	maxPoint := 0
 	for _, number := range numbers {
-		if number.PairPoint > maxPoint {
+		if number.IsGood() && number.PairPoint > maxPoint {
 			maxPoint = number.PairPoint
 		}
 	}
@@ -157,21 +246,101 @@ func normalizeNumerologyScore(totalScore, pairCount, maxPairPoint int) float64 {
 	return clamp(float64(totalScore)/float64(pairCount*maxPairPoint)*100.0, 0, 100)
 }
 
-func buildRankingReasons(item domain.NameResultItem, dayOfBirth, wishQuery string) []string {
-	reasons := []string{fmt.Sprintf("คะแนนเลขศาสตร์ %.0f/100", item.NumerologyScore)}
-	if item.IsPerfectCombined {
-		reasons = append(reasons, fmt.Sprintf("คู่เลขมงคลสมบูรณ์แบบ (+%.0f)", item.PerfectBonus))
+func resolveRankingWeights(request domain.NameSearchRequest) (float64, float64, float64) {
+	// Backward compatibility for older clients that only know the original
+	// semantic slider: preserve its old two-dimensional behavior.
+	if request.NumerologyWeight == nil && request.SoundWeight == nil && request.SemanticWeight != nil {
+		semantic := clamp(*request.SemanticWeight, 0, 1)
+		return 1 - semantic, semantic, 0
 	}
-	if wishQuery != "" && item.SemanticScore >= 70 {
+
+	if request.NumerologyWeight == nil && request.SemanticWeight == nil && request.SoundWeight == nil {
+		return 0.45, 0.35, 0.20
+	}
+
+	numerology := weightValue(request.NumerologyWeight)
+	semantic := weightValue(request.SemanticWeight)
+	sound := weightValue(request.SoundWeight)
+	total := numerology + semantic + sound
+	if total <= 0 {
+		return 0.45, 0.35, 0.20
+	}
+	return numerology / total, semantic / total, sound / total
+}
+
+func weightValue(value *float64) float64 {
+	if value == nil {
+		return 0
+	}
+	return clamp(*value, 0, 1)
+}
+
+func normalizeTwoWeights(first, second float64) (float64, float64) {
+	total := first + second
+	if total <= 0 {
+		return 0.5, 0.5
+	}
+	return first / total, second / total
+}
+
+func calculateSoundScore(euphony, pronunciationEase, rhythm int, name string) float64 {
+	raw := (float64(euphony) * 0.45) +
+		(float64(pronunciationEase) * 0.35) +
+		(float64(rhythm) * 0.20)
+
+	length := utf8.RuneCountInString(name)
+	var penalty float64 = 0
+	if length < 5 {
+		penalty = float64(5-length) * 2.0
+	} else if length > 9 {
+		penalty = float64(length-9) * 2.0
+	}
+
+	return clamp(raw-penalty, 0, 100)
+}
+
+func calibrateSoundScore(raw float64, version string, profile domain.SoundCalibrationProfile) (float64, string) {
+	cleanVersion := strings.TrimSpace(version)
+	if cleanVersion == "" {
+		cleanVersion = domain.MissingPhoneticVersion
+	}
+	stats, ok := profile.Versions[cleanVersion]
+	if !ok || stats.StdDev <= 0 || profile.ReferenceStdDev <= 0 || profile.ReferenceVersion == "" {
+		if profile.Source != "" {
+			return raw, "uncalibrated:" + profile.Source
+		}
+		return raw, "uncalibrated"
+	}
+	calibrated := profile.ReferenceMean +
+		((raw-stats.Mean)/stats.StdDev)*profile.ReferenceStdDev
+	if profile.Approved && profile.Source == "approved_snapshot" {
+		return clamp(calibrated, 0, 100), "approved_snapshot_zscore_to_reference:" + profile.ReferenceVersion
+	}
+	// The fallback is deliberately labelled live: it is recomputed from the
+	// current repository distribution and is not an approved immutable snapshot.
+	return clamp(calibrated, 0, 100), "live_zscore_to_reference:" + profile.ReferenceVersion
+}
+
+func buildRankingReasons(item domain.NameResultItem, dayOfBirth, wishQuery string, semanticAvailable bool) []string {
+	reasons := []string{fmt.Sprintf("คะแนนเลขศาสตร์ %.0f/100", item.NumerologyScore)}
+	if item.SoundScore > 0 {
+		reasons = append(reasons, fmt.Sprintf("คุณภาพเสียงชื่อตัว %.0f/100", item.SoundScore))
+	}
+	if wishQuery != "" && semanticAvailable && item.SemanticScore >= 70 {
 		reasons = append(reasons, fmt.Sprintf("ความหมายสอดคล้อง %.0f/100", item.SemanticScore))
+	} else if wishQuery != "" && !semanticAvailable {
+		reasons = append(reasons, "ไม่ใช้คะแนนความหมาย เนื่องจาก semantic service ไม่พร้อม")
 	}
 	if strings.TrimSpace(dayOfBirth) != "" {
-		reasons = append(reasons, "ผ่านการกรองกาลกิณีตามวันเกิด")
+		reasons = append(reasons, "ชื่อตัวผ่านการกรองกาลกิณีตามวันเกิด")
 	}
 	return reasons
 }
 
 func clamp(value, min, max float64) float64 {
+	if math.IsNaN(value) {
+		return min
+	}
 	if value < min {
 		return min
 	}
@@ -181,7 +350,19 @@ func clamp(value, min, max float64) float64 {
 	return value
 }
 
-func resolveSumMeaning(sum int, goodMap map[int]domain.NumberMeaning) ([]string, string, string, int) {
+const rankingDecimalScale = 1e12
+
+// roundRankingScore makes the public precision the sorting precision too.
+// Sub-display floating-point noise must not silently outrank documented tie
+// breakers such as calibrated sound and Thai name text.
+func roundRankingScore(value float64) float64 {
+	if math.IsNaN(value) || math.IsInf(value, 0) {
+		return 0
+	}
+	return math.Round(value*rankingDecimalScale) / rankingDecimalScale
+}
+
+func resolveSumMeaning(sum int, goodMap map[string]domain.NumberMeaning) ([]string, string, string, int) {
 	if sum <= 0 {
 		return []string{}, "", "", 0
 	}
@@ -193,11 +374,9 @@ func resolveSumMeaning(sum int, goodMap map[int]domain.NumberMeaning) ([]string,
 	totalPoint := 0
 
 	for _, pStr := range pairs {
-		val, _ := strconv.Atoi(pStr)
-		twoDigitStr := fmt.Sprintf("%02d", val)
-		formattedPairs = append(formattedPairs, twoDigitStr)
+		formattedPairs = append(formattedPairs, pStr)
 
-		if n, ok := goodMap[val]; ok {
+		if n, ok := goodMap[pStr]; ok {
 			pType := strings.TrimSpace(n.PairType)
 			if pType != "" {
 				types = append(types, pType)
@@ -216,13 +395,12 @@ func resolveSumMeaning(sum int, goodMap map[int]domain.NumberMeaning) ([]string,
 	}
 
 	typeStr := strings.Join(types, "/")
-	if typeStr == "" {
-		typeStr = "เลขศาสตร์มงคล"
-	}
 
 	descStr := strings.Join(descs, " + ")
 	if descStr == "" {
-		descStr = "พลังคู่เลขมงคลหนุนนำดวงชะตา"
+		// Do not invent a positive interpretation when the governed dictionary
+		// has no reviewed wording for an otherwise eligible pair.
+		descStr = "ยังไม่มีคำอธิบายคู่เลขในฐานข้อมูล"
 	}
 
 	return formattedPairs, typeStr, descStr, totalPoint

@@ -1,0 +1,14 @@
+DROP VIEW IF EXISTS data_governance.v_phonetic_live_zscores;
+DROP VIEW IF EXISTS data_governance.v_phonetic_calibration_stats;
+DROP VIEW IF EXISTS data_governance.v_corpus_title_prefix_candidates;
+DROP VIEW IF EXISTS data_governance.v_name_sum_mismatches;
+DROP VIEW IF EXISTS data_governance.v_name_sum_recalculation;
+DROP VIEW IF EXISTS data_governance.v_runtime_eligible_name_rows;
+DROP VIEW IF EXISTS data_governance.v_character_dictionary_coverage;
+DROP VIEW IF EXISTS data_governance.v_pair_grade_point_anomalies;
+DROP VIEW IF EXISTS data_governance.v_pair_canonical_collisions;
+DROP VIEW IF EXISTS data_governance.v_canonical_number_rows;
+DROP TABLE IF EXISTS data_governance.semantic_vector_snapshots;
+DROP TABLE IF EXISTS data_governance.phonetic_calibration_snapshots;
+DROP TABLE IF EXISTS data_governance.rule_versions;
+DROP SCHEMA IF EXISTS data_governance;

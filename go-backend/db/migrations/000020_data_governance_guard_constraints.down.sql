@@ -1,0 +1,9 @@
+ALTER TABLE public.sha_nums DROP CONSTRAINT IF EXISTS sha_nums_single_character_ck;
+ALTER TABLE public.sat_nums DROP CONSTRAINT IF EXISTS sat_nums_single_character_ck;
+ALTER TABLE public.names_miracle DROP CONSTRAINT IF EXISTS names_miracle_phonetic_version_present_ck;
+ALTER TABLE public.names_miracle DROP CONSTRAINT IF EXISTS names_miracle_sound_components_range_ck;
+ALTER TABLE public.names_miracle DROP CONSTRAINT IF EXISTS names_miracle_sums_present_ck;
+ALTER TABLE public.numbers DROP CONSTRAINT IF EXISTS numbers_grade_point_sign_ck;
+ALTER TABLE public.numbers DROP CONSTRAINT IF EXISTS numbers_pairpoint_bounded_ck;
+ALTER TABLE public.numbers DROP CONSTRAINT IF EXISTS numbers_pairtype_known_ck;
+ALTER TABLE public.numbers DROP CONSTRAINT IF EXISTS numbers_pairnumber_two_digit_ck;

@@ -2,7 +2,6 @@ package pipeline
 
 import (
 	"fmt"
-	"sort"
 	"strconv"
 
 	"go-backend/domain"
@@ -29,64 +28,55 @@ func (f *ModeFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayl
 	}
 	payload.GoodNumbers = allMap
 
-	// Filter good numbers map (D-type) for standalone candidate search.
-	goodMap := make(map[int]domain.NumberMeaning)
-	for k, v := range allMap {
-		if v.IsGood() {
-			goodMap[k] = v
-		}
+	profile, err := f.repo.GetSoundCalibrationProfile(ctx)
+	if err != nil {
+		return fmt.Errorf("mode filter error loading sound calibration: %w", err)
+	}
+	payload.SoundCalibration = profile
+	payload.SemanticCorpus = domain.SemanticCorpusProvenance{
+		Source:               "not_requested",
+		EmbeddingModel:       domain.SemanticEmbeddingModel,
+		InputTemplateVersion: domain.SemanticInputTemplateVersion,
+		VectorDimensions:     domain.SemanticVectorDimensions,
+		CorpusFilterVersion:  domain.CorpusFilterVersion,
 	}
 
-	limit := payload.Request.Limit
-	if limit <= 0 {
-		limit = 100
+	maxSatSum, maxShaSum, err := f.repo.GetNameSumMaximums(ctx)
+	if err != nil {
+		return fmt.Errorf("mode filter error loading name sum ranges: %w", err)
 	}
+	requireCombined := payload.Request.Mode == domain.ModeCombined
+	targetSatSums := eligibleBaseSums(payload.SurnameSatSum, maxSatSum, allMap, requireCombined)
+	targetShaSums := eligibleBaseSums(payload.SurnameShaSum, maxShaSum, allMap, requireCombined)
 
-	// Mode A, B & C (Semantic Wish): Fetch candidates and pass to ScoringFilter for AI Vector Ranking
-	fetchLimit := 1000
+	// Repository limit zero means complete eligible corpus. Candidate retrieval is
+	// deliberately independent of weights so a cached token can be reranked to any
+	// point in the triangle without changing recall.
 	var candidates []domain.NameResultItem
-
-	goodSumList := make([]int, 0, len(goodMap))
-	for num := range goodMap {
-		goodSumList = append(goodSumList, num)
-	}
-	sort.Ints(goodSumList)
-
-	targetSatSums := goodSumList
-	targetShaSums := goodSumList
-	if payload.Request.Mode == domain.ModeCombined {
-		maxSatSum, maxShaSum, err := f.repo.GetNameSumMaximums(ctx)
+	if payload.Request.WishQuery == "" {
+		candidates, err = f.repo.SearchCandidateNames(
+			ctx, targetSatSums, targetShaSums,
+			payload.Request.DayOfBirth, "", 0,
+		)
+	} else if payload.Request.IsNameIntent {
+		payload.SemanticCorpus.Source = "not_applicable_trigram"
+		candidates, err = f.repo.SearchSimilarNames(
+			ctx, targetSatSums, targetShaSums,
+			payload.Request.WishQuery, payload.Request.DayOfBirth, 0,
+		)
+	} else {
+		payload.SemanticCorpus, err = f.repo.GetSemanticCorpusProvenance(ctx)
 		if err != nil {
-			return fmt.Errorf("mode filter error loading name sum ranges: %w", err)
+			return fmt.Errorf("mode filter error verifying semantic vector corpus: %w", err)
 		}
-		targetSatSums = eligibleBaseSums(payload.SurnameSatSum, maxSatSum, allMap)
-		targetShaSums = eligibleBaseSums(payload.SurnameShaSum, maxShaSum, allMap)
+		candidates, err = f.repo.SearchSemanticWishNames(
+			ctx, targetSatSums, targetShaSums,
+			payload.Request.WishQuery, payload.Request.DayOfBirth, 0,
+		)
 	}
-
-	if payload.Request.WishQuery != "" {
-		var cands []domain.NameResultItem
-		var err error
-
-		if payload.Request.IsNameIntent {
-			cands, err = f.repo.SearchSimilarNames(ctx, targetSatSums, targetShaSums, payload.Request.WishQuery, payload.Request.DayOfBirth, fetchLimit)
-		} else {
-			cands, err = f.repo.SearchSemanticWishNames(ctx, targetSatSums, targetShaSums, payload.Request.WishQuery, payload.Request.DayOfBirth, fetchLimit)
-		}
-
-		if err == nil && len(cands) > 0 {
-			candidates = cands
-		} else if err != nil {
-		}
+	if err != nil {
+		return fmt.Errorf("mode filter error fetching complete candidate corpus: %w", err)
 	}
-
-	if len(candidates) == 0 {
-		cands, err := f.repo.SearchCandidateNames(ctx, targetSatSums, targetShaSums, payload.Request.DayOfBirth, payload.Request.WishQuery, fetchLimit)
-		if err != nil {
-			return fmt.Errorf("mode filter error fetching candidates: %w", err)
-		}
-		candidates = cands
-	}
-
 	payload.Candidates = candidates
 	return nil
 }
@@ -94,21 +84,27 @@ func (f *ModeFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayl
 // eligibleBaseSums translates the post-surname safety rule into indexed
 // sat_sum/sha_sum values that PostgreSQL can filter before ranking. It scans the
 // actual sum range in names_miracle, not just the 00-99 dictionary keys.
-func eligibleBaseSums(surnameSum, maxBaseSum int, numbers map[int]domain.NumberMeaning) []int {
+func eligibleBaseSums(surnameSum, maxBaseSum int, numbers map[string]domain.NumberMeaning, requireCombined bool) []int {
 	if maxBaseSum < 0 {
 		return nil
 	}
 
 	eligible := make([]int, 0)
 	for baseSum := 0; baseSum <= maxBaseSum; baseSum++ {
-		if allPairsAreGood(formatTotalValue(baseSum+surnameSum), numbers) {
-			eligible = append(eligible, baseSum)
+		if !allPairsAreGood(formatTotalValue(baseSum), numbers) {
+			continue
 		}
+		if requireCombined && !allPairsAreGood(formatTotalValue(baseSum+surnameSum), numbers) {
+			continue
+		}
+		eligible = append(eligible, baseSum)
 	}
 	return eligible
 }
 
-// formatTotalValue splits multi-digit totals into 2-digit pairs (e.g. 163 -> ["16", "63"], 91 -> ["91"])
+// formatTotalValue resolves sum-based number pairs. A single-digit total is
+// read through its leading-zero pair key (6 -> 06), while authored dictionary
+// keys such as "6" and "06" may still coexist for other data-owner uses.
 func formatTotalValue(total int) []string {
 	if total <= 0 {
 		return []string{}
