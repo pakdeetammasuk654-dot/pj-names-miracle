@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>ดาวน์โหลดแอป (Download App) | ชื่อดี.com</title>
+  <meta name="description" content="ศูนย์ดาวน์โหลดแอปพลิเคชัน ชื่อดี (Miracle Names) สำหรับระบบปฏิบัติการ Android และ iOS">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Sarabun:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .download-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+      margin-bottom: 32px;
+    }
+    .download-card {
+      background: var(--bg-card);
+      border: 1px solid var(--border-gold);
+      border-radius: var(--radius-card);
+      padding: 32px 24px;
+      text-align: center;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .platform-icon {
+      font-size: 3.2rem;
+      margin-bottom: 12px;
+    }
+    .version-tag {
+      background: rgba(212, 175, 55, 0.15);
+      border: 1px solid var(--border-gold);
+      color: var(--gold-light);
+      padding: 4px 12px;
+      border-radius: 999px;
+      font-size: 0.85rem;
+      margin-bottom: 16px;
+    }
+    .install-guide {
+      background: rgba(15, 53, 36, 0.5);
+      border: 1px solid var(--border-gold);
+      border-radius: var(--radius-card);
+      padding: 24px;
+    }
+  </style>
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="header-container">
+      <a href="/" class="brand-link">
+        <img src="/images/app_logo.png" alt="โลโก้ชื่อดี" class="brand-logo-img" width="36" height="36" style="width: 36px; height: 36px; max-width: 36px; max-height: 36px; flex-shrink: 0; border-radius: 50%; border: 1px solid rgba(212, 175, 55, 0.6); object-fit: cover;">
+        <span>ชื่อดี.com</span>
+        <span class="brand-slogan-text">— ชื่อดี ไม่ได้เกิดจากความบังเอิญ</span>
+      </a>
+      <ul class="nav-links">
+        <li><a href="/">หน้าแรก</a></li>
+        <li><a href="/methodology">วิธีคิด</a></li>
+        <li><a href="/download" class="active">ดาวน์โหลดแอป</a></li>
+        <li><a href="/contact">ติดต่อสอบถาม</a></li>
+        <li><a href="/privacy">นโยบายความเป็นส่วนตัว</a></li>
+      </ul>
+    </div>
+  </header>
+
+  <main class="page-content">
+    <div class="slogan-tag">✦ ศูนย์ดาวน์โหลดแอปพลิเคชัน</div>
+    <h1 class="page-title">ดาวน์โหลดแอป "ชื่อดี"</h1>
+    <p class="page-subtitle">ติดตั้งแอปพลิเคชันเพื่อเริ่มต้นจัดอันดับชื่อมงคลที่ดีที่สุดบนโทรศัพท์ของคุณ</p>
+
+    <div class="download-grid">
+      <!-- Android Card -->
+      <div class="download-card">
+        <div>
+          <div class="platform-icon">🤖</div>
+          <div class="version-tag">Android App (APK / Play Store)</div>
+          <h2>ระบบปฏิบัติการ Android</h2>
+          <p>รองรับ Android 8.0 ขึ้นไป ประมวลผลลื่นไหลด้วย Jetpack Compose</p>
+        </div>
+        <div style="margin-top: 24px; width: 100%;">
+          <a href="/static/MiracleNames-TestVersion.apk" class="btn btn-gold" style="width: 100%; margin-bottom: 10px;">
+            📥 ดาวน์โหลดไฟล์ APK (รุ่นทดสอบ)
+          </a>
+          <a href="https://play.google.com" target="_blank" class="btn btn-outline" style="width: 100%;">
+            ▶️ Google Play Store (เร็วๆ นี้)
+          </a>
+        </div>
+      </div>
+
+      <!-- iOS Card -->
+      <div class="download-card">
+        <div>
+          <div class="platform-icon">🍎</div>
+          <div class="version-tag">iOS App (TestFlight / App Store)</div>
+          <h2>ระบบปฏิบัติการ iOS</h2>
+          <p>รองรับ iPhone / iPad (iOS 15.0 ขึ้นไป)</p>
+        </div>
+        <div style="margin-top: 24px; width: 100%;">
+          <a href="https://testflight.apple.com" target="_blank" class="btn btn-outline" style="width: 100%; margin-bottom: 10px;">
+            🚀 เข้าร่วม TestFlight Beta
+          </a>
+          <a href="https://apple.com/app-store" target="_blank" class="btn btn-outline" style="width: 100%;">
+            🍏 Apple App Store (เร็วๆ นี้)
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div class="install-guide">
+      <h2>📌 วิธีติดตั้งไฟล์ APK บนระบบ Android</h2>
+      <ol>
+        <li>กดปุ่ม <strong>"ดาวน์โหลดไฟล์ APK"</strong> ด้านบนลงในอุปกรณ์ Android ของคุณ</li>
+        <li>เปิดไฟล์ที่ดาวน์โหลดมา แล้วเลือก <strong>"ติดตั้ง" (Install)</strong></li>
+        <li>หากขึ้นเตือนการติดตั้งจากแหล่งไม่อนุญาต ให้กดเลือก <strong>"อนุญาตจากแหล่งนี้" (Allow from this source)</strong></li>
+        <li>เปิดแอปพลิเคชัน <strong>"ชื่อดี"</strong> และเริ่มต้นใช้งานได้ทันที</li>
+      </ol>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="footer-container">
+      <div class="footer-copy">
+        © 2026 Miracle Names (ชื่อดี.com) — "ชื่อดี ไม่ได้เกิดจากความบังเอิญ"
+      </div>
+      <ul class="footer-links">
+        <li><a href="/download">ดาวน์โหลด</a></li>
+        <li><a href="/contact">ติดต่อสอบถาม</a></li>
+        <li><a href="/terms">ข้อตกลงการใช้งาน</a></li>
+        <li><a href="/privacy">นโยบายความเป็นส่วนตัว</a></li>
+      </ul>
+    </div>
+  </footer>
+
+</body>
+</html>
