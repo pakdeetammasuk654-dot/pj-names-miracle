@@ -1,18 +1,22 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.gms.google-services")
 }
 
 android {
     namespace = "com.miracle.names"
-    compileSdk = 34
+    compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.miracle.names"
+        applicationId = "com.numberniceic.app"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        targetSdk = 36
+        versionCode = 31
+        versionName = "1.4.14"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -20,8 +24,45 @@ android {
         }
     }
 
+    val localProps = Properties().apply {
+        val localPropsFile = rootProject.file("local.properties")
+        if (localPropsFile.exists()) {
+            FileInputStream(localPropsFile).use { load(it) }
+        }
+    }
+    val releaseKeystorePath = providers.environmentVariable("CHUEDEE_KEYSTORE_PATH").orNull
+        ?: localProps.getProperty("CHUEDEE_KEYSTORE_PATH")
+        ?: if (file("upload-keystore.jks").exists()) "upload-keystore.jks" else null
+    val releaseKeystorePassword = providers.environmentVariable("CHUEDEE_KEYSTORE_PASSWORD").orNull
+        ?: localProps.getProperty("CHUEDEE_KEYSTORE_PASSWORD")
+    val releaseKeyAlias = providers.environmentVariable("CHUEDEE_KEY_ALIAS").orNull
+        ?: localProps.getProperty("CHUEDEE_KEY_ALIAS")
+    val releaseKeyPassword = providers.environmentVariable("CHUEDEE_KEY_PASSWORD").orNull
+        ?: localProps.getProperty("CHUEDEE_KEY_PASSWORD")
+
+    signingConfigs {
+        if (
+            releaseKeystorePath != null &&
+            releaseKeystorePassword != null &&
+            releaseKeyAlias != null &&
+            releaseKeyPassword != null
+        ) {
+            create("release") {
+                storeFile = file(releaseKeystorePath)
+                storePassword = releaseKeystorePassword
+                keyAlias = releaseKeyAlias
+                keyPassword = releaseKeyPassword
+            }
+        }
+    }
+
     buildTypes {
+        debug {
+            buildConfigField("String", "API_BASE_URL", "\"https://xn--b3cu8e7ah6h.com/\"")
+        }
         release {
+            signingConfigs.findByName("release")?.let { signingConfig = it }
+            buildConfigField("String", "API_BASE_URL", "\"https://xn--b3cu8e7ah6h.com/\"")
             isMinifyEnabled = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
@@ -35,6 +76,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     packaging {
         resources {
@@ -50,9 +92,14 @@ kotlin {
 }
 
 dependencies {
+    implementation("androidx.core:core-splashscreen:1.0.1")
     implementation("io.coil-kt:coil-compose:2.6.0")
     implementation("io.coil-kt:coil-svg:2.6.0")
+    implementation("com.android.billingclient:billing-ktx:8.3.0")
 
+    // Firebase Cloud Messaging
+    implementation(platform("com.google.firebase:firebase-bom:33.1.2"))
+    implementation("com.google.firebase:firebase-messaging-ktx")
 
     implementation("androidx.core:core-ktx:1.12.0")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.7.0")
@@ -67,7 +114,6 @@ dependencies {
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.7.0")
     implementation("dev.shreyaspatil:capturable:2.1.0")
-
 
     // Retrofit & Gson for Networking
     implementation("com.squareup.retrofit2:retrofit:2.9.0")

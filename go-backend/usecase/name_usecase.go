@@ -5,8 +5,10 @@ import (
 	"encoding/base64"
 	"errors"
 	"fmt"
+	"log"
 	"math"
 	"strings"
+	"time"
 
 	"go-backend/domain"
 	"go-backend/repository"
@@ -34,24 +36,54 @@ func (u *nameSearchUseCase) SearchTopNames(ctx context.Context, req domain.NameS
 }
 
 func (u *nameSearchUseCase) SearchTopNamesWithToken(ctx context.Context, req domain.NameSearchRequest) (domain.NameSearchResult, error) {
+	totalStart := time.Now()
+	defer func() {
+		log.Printf("[Perf][NameSearch] SearchTopNamesWithToken total=%s", time.Since(totalStart).Round(time.Millisecond))
+	}()
+
 	var err error
+	stepStart := time.Now()
 	req, err = normalizeAndValidateNameSearchRequest(req)
 	if err != nil {
 		return domain.NameSearchResult{}, err
 	}
+	log.Printf("[Perf][NameSearch] normalize request duration=%s mode=%s day=%s wish=%t name_intent=%t",
+		time.Since(stepStart).Round(time.Millisecond),
+		req.Mode,
+		req.DayOfBirth,
+		req.WishQuery != "",
+		req.IsNameIntent,
+	)
 
+	stepStart = time.Now()
 	pool, err := u.prepareCandidatePool(ctx, req)
 	if err != nil {
 		return domain.NameSearchResult{}, err
 	}
+	log.Printf("[Perf][NameSearch] prepare candidate pool duration=%s candidates=%d",
+		time.Since(stepStart).Round(time.Millisecond),
+		len(pool.candidates),
+	)
+
+	stepStart = time.Now()
 	outcome, err := scoreCandidatePool(ctx, pool, req)
 	if err != nil {
 		return domain.NameSearchResult{}, err
 	}
+	if err := u.enrichResultMeanings(ctx, outcome.data, req, pool.surnameMeaning); err != nil {
+		return domain.NameSearchResult{}, err
+	}
+	log.Printf("[Perf][NameSearch] score candidate pool duration=%s results=%d",
+		time.Since(stepStart).Round(time.Millisecond),
+		len(outcome.data),
+	)
+
+	stepStart = time.Now()
 	token, err := u.candidateCache.Put(pool)
 	if err != nil {
 		return domain.NameSearchResult{}, fmt.Errorf("failed to cache name candidates: %w", err)
 	}
+	log.Printf("[Perf][NameSearch] cache candidate pool duration=%s", time.Since(stepStart).Round(time.Millisecond))
 
 	return domain.NameSearchResult{
 		CandidateToken:                    token,
@@ -73,28 +105,47 @@ func (u *nameSearchUseCase) SearchTopNamesWithToken(ctx context.Context, req dom
 }
 
 func (u *nameSearchUseCase) RerankTopNames(ctx context.Context, req domain.NameRerankRequest) (domain.NameSearchResult, error) {
+	totalStart := time.Now()
+	defer func() {
+		log.Printf("[Perf][NameSearch] RerankTopNames total=%s", time.Since(totalStart).Round(time.Millisecond))
+	}()
+
 	if err := validateNameRerankRequest(req); err != nil {
 		return domain.NameSearchResult{}, err
 	}
 
 	token := strings.TrimSpace(req.CandidateToken)
+	stepStart := time.Now()
 	pool, ok := u.candidateCache.Get(token)
 	if !ok {
 		return domain.NameSearchResult{}, domain.ErrCandidateTokenNotFound
 	}
+	log.Printf("[Perf][NameSearch] get cached candidate pool duration=%s candidates=%d",
+		time.Since(stepStart).Round(time.Millisecond),
+		len(pool.candidates),
+	)
 
 	rankingRequest := cloneSearchRequest(pool.request)
 	rankingRequest.NumerologyWeight = cloneFloat(req.NumerologyWeight)
 	rankingRequest.SemanticWeight = cloneFloat(req.SemanticWeight)
 	rankingRequest.SoundWeight = cloneFloat(req.SoundWeight)
+	rankingRequest.SimilarityWeight = cloneFloat(req.SimilarityWeight)
 	if req.Limit > 0 {
 		rankingRequest.Limit = req.Limit
 	}
 
+	stepStart = time.Now()
 	outcome, err := scoreCandidatePool(ctx, pool, rankingRequest)
 	if err != nil {
 		return domain.NameSearchResult{}, err
 	}
+	if err := u.enrichResultMeanings(ctx, outcome.data, rankingRequest, pool.surnameMeaning); err != nil {
+		return domain.NameSearchResult{}, err
+	}
+	log.Printf("[Perf][NameSearch] rerank score candidate pool duration=%s results=%d",
+		time.Since(stepStart).Round(time.Millisecond),
+		len(outcome.data),
+	)
 
 	return domain.NameSearchResult{
 		CandidateToken:                    token,
@@ -115,6 +166,35 @@ func (u *nameSearchUseCase) RerankTopNames(ctx context.Context, req domain.NameR
 	}, nil
 }
 
+func (u *nameSearchUseCase) enrichResultMeanings(
+	ctx context.Context,
+	results []domain.NameResultItem,
+	req domain.NameSearchRequest,
+	fixedMeaning string,
+) error {
+	nameIDs := make([]int, 0, len(results))
+	for _, item := range results {
+		nameIDs = append(nameIDs, item.NameID)
+	}
+	meanings, err := u.repo.GetMeaningsByNameIDs(ctx, nameIDs)
+	if err != nil {
+		return err
+	}
+	for i := range results {
+		candidateMeaning := meanings[results[i].NameID]
+		if req.Mode != domain.ModeCombined {
+			results[i].Meaning = candidateMeaning
+			continue
+		}
+		if req.SearchTarget == domain.TargetSurname {
+			results[i].Meaning = domain.CombineMeanings(fixedMeaning, candidateMeaning)
+		} else {
+			results[i].Meaning = domain.CombineMeanings(candidateMeaning, fixedMeaning)
+		}
+	}
+	return nil
+}
+
 func normalizeAndValidateNameSearchRequest(req domain.NameSearchRequest) (domain.NameSearchRequest, error) {
 	if req.Limit == 0 {
 		req.Limit = 100
@@ -126,7 +206,16 @@ func normalizeAndValidateNameSearchRequest(req domain.NameSearchRequest) (domain
 	}
 	req.Surname = strings.TrimSpace(req.Surname)
 	req.DayOfBirth = strings.ToLower(strings.TrimSpace(req.DayOfBirth))
+	req.PrototypeName = strings.TrimSpace(req.PrototypeName)
 	req.WishQuery = strings.TrimSpace(req.WishQuery)
+	if req.PrototypeName != "" {
+		req.IsNameIntent = true
+	}
+	// Older published clients put the prototype name in wish_query. Keep those
+	// requests working while new clients send the two intents separately.
+	if req.IsNameIntent && req.PrototypeName == "" && req.WishQuery != "" {
+		req.PrototypeName = req.WishQuery
+	}
 
 	switch req.Mode {
 	case domain.ModeStandalone, domain.ModeCombined, domain.ModeSemantic:
@@ -134,18 +223,25 @@ func normalizeAndValidateNameSearchRequest(req domain.NameSearchRequest) (domain
 		return domain.NameSearchRequest{}, fmt.Errorf("%w: unsupported mode %q", domain.ErrInvalidSearchRequest, req.Mode)
 	}
 	if req.Mode == domain.ModeCombined {
+		if req.SearchTarget == "" {
+			req.SearchTarget = domain.TargetFirstName
+		}
+		if req.SearchTarget != domain.TargetFirstName && req.SearchTarget != domain.TargetSurname {
+			return domain.NameSearchRequest{}, fmt.Errorf("%w: unsupported search_target %q", domain.ErrInvalidSearchRequest, req.SearchTarget)
+		}
 		if req.Surname == "" {
 			return domain.NameSearchRequest{}, fmt.Errorf("%w: surname is required in combined mode", domain.ErrInvalidSearchRequest)
 		}
 	} else {
 		// Prevent stale form state from leaking into standalone result metadata.
 		req.Surname = ""
+		req.SearchTarget = domain.TargetFirstName
 	}
 	if req.Mode == domain.ModeSemantic && req.WishQuery == "" {
 		return domain.NameSearchRequest{}, fmt.Errorf("%w: wish_query is required in semantic mode", domain.ErrInvalidSearchRequest)
 	}
-	if req.IsNameIntent && req.WishQuery == "" {
-		return domain.NameSearchRequest{}, fmt.Errorf("%w: wish_query is required for name intent", domain.ErrInvalidSearchRequest)
+	if req.IsNameIntent && req.PrototypeName == "" {
+		return domain.NameSearchRequest{}, fmt.Errorf("%w: prototype_name is required for name intent", domain.ErrInvalidSearchRequest)
 	}
 	if req.DayOfBirth != "" && !isValidDayOfBirth(req.DayOfBirth) {
 		return domain.NameSearchRequest{}, fmt.Errorf("%w: unsupported day_of_birth %q", domain.ErrInvalidSearchRequest, req.DayOfBirth)
@@ -167,7 +263,7 @@ func isValidDayOfBirth(day string) bool {
 
 func validateInitialWeights(req domain.NameSearchRequest) error {
 	present := 0
-	for _, weight := range []*float64{req.NumerologyWeight, req.SemanticWeight, req.SoundWeight} {
+	for _, weight := range []*float64{req.NumerologyWeight, req.SemanticWeight, req.SoundWeight, req.SimilarityWeight} {
 		if weight != nil {
 			present++
 		}
@@ -177,14 +273,15 @@ func validateInitialWeights(req domain.NameSearchRequest) error {
 	}
 	// Preserve the legacy semantic-only slider contract.
 	legacySemanticOnly := present == 1 && req.SemanticWeight != nil
-	if present != 3 && !legacySemanticOnly {
-		return fmt.Errorf("%w: provide all three weights or semantic_weight alone for the legacy contract", domain.ErrInvalidSearchRequest)
+	if present != 3 && present != 4 && !legacySemanticOnly {
+		return fmt.Errorf("%w: provide all four weights (or the legacy three-weight contract)", domain.ErrInvalidSearchRequest)
 	}
 	total := 0.0
 	for name, weight := range map[string]*float64{
 		"numerology_weight": req.NumerologyWeight,
 		"semantic_weight":   req.SemanticWeight,
 		"sound_weight":      req.SoundWeight,
+		"similarity_weight": req.SimilarityWeight,
 	} {
 		if weight == nil {
 			continue
@@ -203,6 +300,7 @@ func validateInitialWeights(req domain.NameSearchRequest) error {
 func (u *nameSearchUseCase) prepareCandidatePool(ctx context.Context, req domain.NameSearchRequest) (cachedCandidatePool, error) {
 	payload := &domain.NameSearchPayload{Request: req}
 	if req.Mode == domain.ModeCombined && strings.TrimSpace(req.Surname) != "" {
+		stepStart := time.Now()
 		satSum, shaSum, err := u.repo.GetSurnameSums(ctx, req.Surname)
 		if err != nil {
 			if errors.Is(err, domain.ErrUnmappedCharacters) {
@@ -210,8 +308,15 @@ func (u *nameSearchUseCase) prepareCandidatePool(ctx context.Context, req domain
 			}
 			return cachedCandidatePool{}, err
 		}
+		log.Printf("[Perf][NameSearch] GetSurnameSums duration=%s sat_sum=%d sha_sum=%d",
+			time.Since(stepStart).Round(time.Millisecond),
+			satSum,
+			shaSum,
+		)
 		payload.SurnameSatSum = satSum
 		payload.SurnameShaSum = shaSum
+		_, _, surnameMeaning, _ := u.repo.GetSumsByTHName(ctx, req.Surname)
+		payload.SurnameMeaning = surnameMeaning
 	}
 
 	pCtx := &domain.PipelineContext[*domain.NameSearchPayload]{
@@ -222,7 +327,7 @@ func (u *nameSearchUseCase) prepareCandidatePool(ctx context.Context, req domain
 	// Prepare every value ScoringFilter needs. This is the only phase allowed to
 	// call the repository; reranks resume from the cached output of this phase.
 	pipe := domain.NewPipeline[*domain.NameSearchPayload](
-		pipeline.NewModeFilter(u.repo), // Step 1: Filter D10/D8/D5 by Search Mode
+		pipeline.NewModeFilter(u.repo), // Step 1: Load the complete governed candidate pool
 		pipeline.NewKalakiniFilter(),   // Step 2: Day of Birth Kalakini Safety Filter (100% Kalakini Free)
 	)
 
@@ -234,6 +339,7 @@ func (u *nameSearchUseCase) prepareCandidatePool(ctx context.Context, req domain
 		request:          cloneSearchRequest(pCtx.Data.Request),
 		surnameSatSum:    pCtx.Data.SurnameSatSum,
 		surnameShaSum:    pCtx.Data.SurnameShaSum,
+		surnameMeaning:   pCtx.Data.SurnameMeaning,
 		goodNumbers:      pCtx.Data.GoodNumbers,
 		soundCalibration: pCtx.Data.SoundCalibration,
 		semanticCorpus:   pCtx.Data.SemanticCorpus,
@@ -258,6 +364,7 @@ func scoreCandidatePool(ctx context.Context, pool cachedCandidatePool, req domai
 		Request:          cloneSearchRequest(req),
 		SurnameSatSum:    pool.surnameSatSum,
 		SurnameShaSum:    pool.surnameShaSum,
+		SurnameMeaning:   pool.surnameMeaning,
 		GoodNumbers:      pool.goodNumbers,
 		SoundCalibration: cloneSoundCalibrationProfile(pool.soundCalibration),
 		SemanticCorpus:   pool.semanticCorpus,
@@ -285,18 +392,23 @@ func buildNameSearchPolicy(
 	calibration domain.SoundCalibrationProfile,
 	semanticCorpus domain.SemanticCorpusProvenance,
 ) domain.NameSearchPolicy {
-	pairScope := "first_name_all_d_pairs"
+	candidateScope := string(domain.TargetFirstName)
+	if req.Mode == domain.ModeCombined && req.SearchTarget == domain.TargetSurname {
+		candidateScope = string(domain.TargetSurname)
+	}
+	pairScope := candidateScope + "_" + pipeline.AdaptivePairScope(req)
 	if req.Mode == domain.ModeCombined {
-		pairScope = "first_name_and_combined_all_d_pairs"
+		pairScope = candidateScope + "_and_combined_" + pipeline.AdaptivePairScope(req)
 	}
 	kalakiniScope := "not_applied"
 	if req.DayOfBirth != "" {
-		kalakiniScope = "first_name"
+		kalakiniScope = candidateScope
 	}
 	return domain.NameSearchPolicy{
+		RankingContractVersion:        domain.RankingContractVersion,
 		PairScope:                     pairScope,
 		KalakiniScope:                 kalakiniScope,
-		SoundScope:                    "first_name",
+		SoundScope:                    candidateScope,
 		NumerologyRuleVersion:         domain.NumerologyRuleVersion,
 		SoundFormulaVersion:           domain.SoundFormulaVersion,
 		RankingPrecisionVersion:       domain.RankingPrecisionVersion,
@@ -346,6 +458,13 @@ func validateNameRerankRequest(req domain.NameRerankRequest) error {
 		}
 		total += value
 	}
+	if req.SimilarityWeight != nil {
+		value := *req.SimilarityWeight
+		if math.IsNaN(value) || math.IsInf(value, 0) || value < 0 || value > 1 {
+			return fmt.Errorf("%w: similarity_weight must be between 0 and 1", domain.ErrInvalidRerankRequest)
+		}
+		total += value
+	}
 	if total <= 0 {
 		return fmt.Errorf("%w: at least one weight must be greater than zero", domain.ErrInvalidRerankRequest)
 	}
@@ -369,4 +488,60 @@ func (u *nameSearchUseCase) GetSumsForText(ctx context.Context, text string) (in
 
 func (u *nameSearchUseCase) GetSampleNames(ctx context.Context) ([]domain.Celebrity, error) {
 	return u.repo.GetSampleNames(ctx)
+}
+
+func (u *nameSearchUseCase) GetRandomMeanings(ctx context.Context, limit int) ([]string, error) {
+	return u.repo.GetRandomMeanings(ctx, limit)
+}
+
+func (u *nameSearchUseCase) SuggestNames(ctx context.Context, seedName string, limit int) ([]domain.NameResultItem, error) {
+	items, err := u.repo.SuggestNames(ctx, seedName, limit)
+	if err != nil {
+		return nil, err
+	}
+	numbersMap, err := u.repo.GetAllNumbersMap(ctx)
+	if err != nil {
+		return nil, err
+	}
+	for i := range items {
+		satPairs := splitTotalToPairs(items[i].SatSum)
+		shaPairs := splitTotalToPairs(items[i].ShaSum)
+		items[i].CandidateSatPairs = make([]domain.PairPresentation, 0, len(satPairs))
+		for _, p := range satPairs {
+			meaning, ok := numbersMap[p]
+			items[i].CandidateSatPairs = append(items[i].CandidateSatPairs, domain.PairPresentation{
+				Value:  p,
+				Type:   strings.TrimSpace(meaning.PairType),
+				IsGood: ok && meaning.IsGood(),
+			})
+		}
+		items[i].CandidateShaPairs = make([]domain.PairPresentation, 0, len(shaPairs))
+		for _, p := range shaPairs {
+			meaning, ok := numbersMap[p]
+			items[i].CandidateShaPairs = append(items[i].CandidateShaPairs, domain.PairPresentation{
+				Value:  p,
+				Type:   strings.TrimSpace(meaning.PairType),
+				IsGood: ok && meaning.IsGood(),
+			})
+		}
+	}
+	return items, nil
+}
+
+func splitTotalToPairs(total int) []string {
+	if total <= 0 {
+		return []string{}
+	}
+	totalStr := fmt.Sprintf("%d", total)
+	if len(totalStr) == 1 {
+		return []string{fmt.Sprintf("%02d", total)}
+	}
+	if len(totalStr) == 2 {
+		return []string{totalStr}
+	}
+	var pairs []string
+	for i := 0; i < len(totalStr)-1; i++ {
+		pairs = append(pairs, totalStr[i:i+2])
+	}
+	return pairs
 }

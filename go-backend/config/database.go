@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
+	"time"
 
 	"github.com/joho/godotenv"
 	_ "github.com/lib/pq"
@@ -36,8 +38,14 @@ func InitDB() (*sql.DB, error) {
 		return nil, err
 	}
 
-	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		host, port, user, pass, dbname)
+	sslMode := strings.ToLower(getEnv("DB_SSLMODE", "disable"))
+	switch sslMode {
+	case "disable", "require", "verify-ca", "verify-full":
+	default:
+		return nil, fmt.Errorf("DB_SSLMODE must be disable, require, verify-ca, or verify-full")
+	}
+	psqlInfo := fmt.Sprintf("host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		host, port, user, pass, dbname, sslMode)
 
 	db, err := sql.Open("postgres", psqlInfo)
 	if err != nil {
@@ -46,9 +54,15 @@ func InitDB() (*sql.DB, error) {
 
 	db.SetMaxOpenConns(25)
 	db.SetMaxIdleConns(10)
+	db.SetConnMaxLifetime(30 * time.Minute)
+	db.SetConnMaxIdleTime(5 * time.Minute)
 
 	if err := db.Ping(); err != nil {
 		return nil, fmt.Errorf("failed to ping db: %w", err)
+	}
+
+	if _, err := db.Exec("SELECT set_limit(0.15)"); err != nil {
+		log.Printf("[Database] Note: set_limit(0.15) warning: %v", err)
 	}
 
 	log.Println("[Database] Successfully connected to PostgreSQL!")

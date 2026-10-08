@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "582672642968",
+    "project_id": "miracle-names",
+    "storage_bucket": "miracle-names.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:582672642968:android:03c0502c83c988368f31ed",
+        "android_client_info": {
+          "package_name": "com.numberniceic.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBR5G_8aGidU4J6TA7yJ0XM5eaHyXYFvq4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

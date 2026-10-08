@@ -10,6 +10,8 @@ android-frontend/app/build/
 android-frontend/local.properties
 *.apk
 *.aab
+*.jks
+*.keystore
 
 # Go local configuration and generated artifacts
 go-backend/.env
@@ -17,6 +19,30 @@ go-backend/bin/
 go-backend/names.db
 *.test
 *.out
+
+# iOS build outputs and state
+ios-frontend/build/
+ios-frontend-admin/build/
+**/.derivedData*/
+**/DerivedData/
+*.xcarchive
+*.ipa
+*.xcuserstate
+**/xcuserdata/
+
+# Android release directories
+android-frontend/release-output/
+android-frontend/play-store-release/
+android-frontend/test-build/
+android-frontend/app/release/
+
+# Media and video cuts
+gpt-cut/
+gemini-cut/
+*.mp4
+*.m4v
+*.mov
+*.zip
 
 # Local logs
 *.log

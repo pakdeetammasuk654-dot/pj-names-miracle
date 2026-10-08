@@ -1,0 +1,283 @@
+{{define "name_admin.html"}}<!doctype html>
+<html lang="th"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>จัดการและเพิ่มชื่อมงคล | ชื่อดี</title><link rel="stylesheet" href="/static/styles.css?v=11">
+<style>
+.name-admin{max-width:1160px;padding-top:34px;margin:0 auto;padding-bottom:60px}
+.name-admin h1{color:var(--gold-light);font-size:2.1rem;margin-bottom:6px}
+.name-admin p.lead{color:var(--text-muted);margin-bottom:24px}
+
+.card-box{background:var(--bg-card);border:1px solid var(--border-gold);padding:24px;border-radius:10px;margin-bottom:28px;box-shadow:0 4px 20px rgba(0,0,0,.25)}
+.card-title{color:var(--gold-light);font-size:1.3rem;font-weight:700;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+
+.input-row{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:18px}
+.input-name{flex:1;min-width:240px;padding:12px 16px;font-size:1.15rem;font-weight:700;border:1px solid var(--border-gold);background:#1F120B;color:#fff;border-radius:8px}
+.input-name:focus{outline:none;border-color:var(--gold-primary);box-shadow:0 0 0 2px rgba(212,175,55,.25)}
+
+.select-gender{padding:12px 14px;border:1px solid var(--border-gold);background:#1F120B;color:#fff;border-radius:8px;font-size:1rem}
+
+.btn{padding:12px 18px;border-radius:8px;font-weight:700;cursor:pointer;border:0;display:inline-flex;align-items:center;gap:6px;text-decoration:none;font-size:1rem}
+.btn-ai{background:linear-gradient(135deg,#c59b27,#f3e5ab);color:#140B07;box-shadow:0 2px 10px rgba(212,175,55,.3)}
+.btn-ai:hover{filter:brightness(1.1)}
+.btn-secondary{background:#26160E;color:var(--gold-light);border:1px solid var(--border-gold)}
+.btn-secondary:hover{background:#382014}
+.btn-save{background:#1e824c;color:#fff;font-size:1.1rem;padding:14px 28px;width:100%;justify-content:center;margin-top:16px}
+.btn-save:hover{background:#27ae60}
+
+.alert{padding:12px 16px;border-radius:8px;margin-bottom:16px;font-size:.95rem}
+.alert-success{background:#154124;border:1px solid #2ecc71;color:#e8f8f0}
+.alert-error{background:#4a1515;border:1px solid #e74c3c;color:#fde8e8}
+.alert-warning{background:#4e3d0f;border:1px solid #f39c12;color:#fef5e7}
+
+.preview-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin:20px 0}
+.stat-card{background:#1F120B;border:1px solid rgba(212,175,55,.3);padding:16px;border-radius:8px}
+.stat-card-title{font-size:.85rem;color:var(--text-muted);margin-bottom:6px}
+.stat-card-val{font-size:1.6rem;font-weight:800;color:var(--gold-light);display:flex;align-items:center;gap:10px}
+
+.pair-badge{display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;font-size:.88rem;font-weight:800;color:#fff;box-shadow:0 2px 6px rgba(0,0,0,.3)}
+.pair-green{background:linear-gradient(145deg,#27ae60,#1e824c);border:1.5px solid #2ecc71}
+.pair-red{background:linear-gradient(145deg,#e74c3c,#c0392b);border:1.5px solid #ff7675}
+
+.day-badges{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+.day-badge{padding:5px 10px;border-radius:6px;font-size:.82rem;font-weight:600}
+.day-safe{background:#113821;color:#68d391;border:1px solid #27ae60}
+.day-kakis{background:#3b1313;color:#fc8181;border:1px solid #e53e3e}
+
+.meaning-box{margin-top:18px}
+.meaning-box label{display:block;color:var(--gold-light);font-weight:700;margin-bottom:6px}
+.meaning-textarea{width:100%;box-sizing:border-box;padding:12px;background:#1F120B;border:1px solid var(--border-gold);color:#fff;border-radius:8px;font-size:1.05rem;min-height:80px;resize:vertical}
+.meaning-textarea:focus{outline:none;border-color:var(--gold-primary)}
+
+.table-wrap{overflow-x:auto;border:1px solid var(--border-gold);border-radius:8px;background:var(--bg-card)}
+table{width:100%;border-collapse:collapse;text-align:left;font-size:.92rem}
+th{background:#26160E;color:var(--gold-light);padding:12px 14px;border-bottom:1px solid var(--border-gold);white-space:nowrap}
+td{padding:12px 14px;border-bottom:1px solid rgba(212,175,55,.18);color:rgba(255,255,255,.88)}
+tr:hover{background:rgba(212,175,55,.06)}
+.tag-vector{padding:2px 8px;border-radius:12px;font-size:.75rem;background:#18452b;color:#a3e635;border:1px solid #65a30d}
+
+.search-bar{display:flex;gap:10px;margin-bottom:16px}
+.search-input{flex:1;max-width:360px;padding:10px 14px;background:#1F120B;border:1px solid var(--border-gold);color:#fff;border-radius:6px}
+.loading-spinner{display:none;width:18px;height:18px;border:2px solid rgba(0,0,0,.3);border-radius:50%;border-top-color:#000;animation:spin .8s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+</style>
+</head><body><main class="page-content name-admin">
+<h1>ระบบจัดการและเพิ่มชื่อมงคล</h1>
+<p class="lead">เพิ่มชื่อใหม่เข้าสู่ระบบอัตโนมัติ คำนวณเลขศาสตร์ พลังเงา คู่เลข กาลกิณี 8 วัน และสร้างความหมายพร้อม Semantic Vector ด้วย AI</p>
+
+{{if .SuccessMessage}}<div class="alert alert-success">{{.SuccessMessage}}</div>{{end}}
+{{if .ErrorMessage}}<div class="alert alert-error">{{.ErrorMessage}}</div>{{end}}
+
+<section class="card-box">
+  <div class="card-title">✨ เพิ่มชื่อมงคลใหม่</div>
+  
+  <div class="input-row">
+    <input type="text" id="thname-input" class="input-name" placeholder="พิมพ์ชื่อภาษาไทย (เช่น เจเน่, ณัฐภัสสร)" autocomplete="off">
+    <select id="gender-select" class="select-gender">
+      <option value="ค">ทุกเพศ</option>
+      <option value="ช">ชาย</option>
+      <option value="ญ">หญิง</option>
+    </select>
+    <button type="button" class="btn btn-ai" id="btn-ai-analyze" onclick="analyzeName(true)">
+      <span class="btn-text">✨ วิเคราะห์ & สร้างความหมาย AI</span>
+      <span class="loading-spinner" id="spinner"></span>
+    </button>
+    <button type="button" class="btn btn-secondary" onclick="analyzeName(false)">
+      คำนวณเลขศาสตร์ทันที
+    </button>
+  </div>
+
+  <div id="duplicate-warning" style="display:none;" class="alert alert-warning">
+    ⚠️ <strong>คำเตือน:</strong> มีชื่อนี้ในฐานข้อมูลแล้ว (<span id="dup-name"></span> ID: <span id="dup-id"></span>) หากบันทึกซ้ำจะถูกปฏิเสธ
+  </div>
+
+  <form id="save-form" method="post" action="/admin/names/create" style="display:none;">
+    <input type="hidden" name="thname" id="form-thname">
+    <input type="hidden" name="gender" id="form-gender">
+    <input type="hidden" name="sat_sum" id="form-sat">
+    <input type="hidden" name="sha_sum" id="form-sha">
+    <input type="hidden" name="euphony_score" id="form-euphony">
+    <input type="hidden" name="pronunciation_ease" id="form-ease">
+    <input type="hidden" name="rhythm_score" id="form-rhythm">
+
+    <div class="preview-grid">
+      <div class="stat-card">
+        <div class="stat-card-title">ผลรวมเลขศาสตร์ (Sat Sum)</div>
+        <div class="stat-card-val">
+          <span id="preview-sat">-</span>
+          <div id="preview-sat-pairs" style="display:inline-flex;gap:4px;"></div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-title">ผลรวมพลังเงา (Sha Sum)</div>
+        <div class="stat-card-val">
+          <span id="preview-sha">-</span>
+          <div id="preview-sha-pairs" style="display:inline-flex;gap:4px;"></div>
+        </div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-card-title">คะแนนการออกเสียง (Phonetics)</div>
+        <div class="stat-card-val" style="font-size:1.1rem;gap:14px;color:rgba(255,255,255,.85)">
+          <span>ความลื่นไหล: <strong id="preview-euphony" style="color:var(--gold-light)">-</strong></span>
+          <span>ออกเสียงง่าย: <strong id="preview-ease" style="color:var(--gold-light)">-</strong></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="stat-card" style="margin-bottom:16px;">
+      <div class="stat-card-title">การตรวจสอบกาลกิณี 8 วันเกิด</div>
+      <div class="day-badges" id="preview-days"></div>
+    </div>
+
+    <div class="meaning-box">
+      <label for="form-meaning">ความหมายภาษาไทย (AI สร้างให้ หรือแก้ไขได้ตามต้องการ):</label>
+      <textarea name="meaning" id="form-meaning" class="meaning-textarea" placeholder="ความหมายภาษาไทย..." required></textarea>
+    </div>
+
+    <button type="submit" class="btn btn-save" id="btn-save-submit">
+      💾 บันทึกชื่อเข้าสู่ระบบ (คำนวณและสร้าง Vector อัตโนมัติ)
+    </button>
+  </form>
+</section>
+
+<section>
+  <div class="card-title">📚 รายชื่อมงคลในระบบ (ทั้งหมด {{.TotalCount}} ชื่อ)</div>
+  <form method="get" action="/admin/names" class="search-bar">
+    <input type="text" name="q" class="search-input" placeholder="ค้นหาชื่อ หรือความหมาย..." value="{{.SearchQuery}}">
+    <button type="submit" class="btn btn-secondary">ค้นหา</button>
+    {{if .SearchQuery}}<a href="/admin/names" class="btn btn-secondary">ล้างค้นหา</a>{{end}}
+  </form>
+
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>ชื่อ</th>
+          <th>เพศ</th>
+          <th>เลขศาสตร์</th>
+          <th>พลังเงา</th>
+          <th>ความหมาย</th>
+          <th>เวกเตอร์ AI</th>
+        </tr>
+      </thead>
+      <tbody>
+        {{range .RecentNames}}
+        <tr>
+          <td>{{.NameID}}</td>
+          <td><strong>{{.THName}}</strong></td>
+          <td>{{if eq .Gender "ช"}}ชาย{{else if eq .Gender "ญ"}}หญิง{{else}}ทุกเพศ{{end}}</td>
+          <td><span style="color:var(--gold-light);font-weight:700">{{.SatSum}}</span></td>
+          <td><span style="color:var(--gold-light);font-weight:700">{{.ShaSum}}</span></td>
+          <td>{{if .Meaning}}{{.Meaning}}{{else}}<span style="color:var(--text-muted)">-</span>{{end}}</td>
+          <td>{{if .HasVector}}<span class="tag-vector">✓ มี Vector</span>{{else}}<span style="color:var(--text-muted)">ไม่มี</span>{{end}}</td>
+        </tr>
+        {{else}}
+        <tr><td colspan="7" style="text-align:center;padding:24px;color:var(--text-muted)">ไม่พบข้อมูลรายชื่อ</td></tr>
+        {{end}}
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<script>
+async function analyzeName(autoMeaning) {
+  const nameInput = document.querySelector('#thname-input');
+  const genderSelect = document.querySelector('#gender-select');
+  const name = nameInput.value.trim();
+  if (!name) {
+    alert('กรุณากรอกชื่อภาษาไทยก่อนครับ');
+    nameInput.focus();
+    return;
+  }
+
+  const spinner = document.querySelector('#spinner');
+  const btn = document.querySelector('#btn-ai-analyze');
+  spinner.style.display = 'inline-block';
+  btn.disabled = true;
+
+  try {
+    const res = await fetch('/admin/names/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        thname: name,
+        gender: genderSelect.value,
+        auto_meaning: autoMeaning
+      })
+    });
+    const data = await res.json();
+    if (!res.ok || data.error) {
+      alert(data.message || 'เกิดข้อผิดพลาดในการวิเคราะห์ชื่อ');
+      return;
+    }
+
+    const item = data.data;
+    const saveForm = document.querySelector('#save-form');
+    saveForm.style.display = 'block';
+
+    const dupWarning = document.querySelector('#duplicate-warning');
+    const btnSubmit = document.querySelector('#btn-save-submit');
+    if (item.already_exists) {
+      dupWarning.style.display = 'block';
+      document.querySelector('#dup-name').textContent = item.thname;
+      document.querySelector('#dup-id').textContent = item.existing_id;
+      btnSubmit.disabled = true;
+      btnSubmit.style.opacity = '0.5';
+    } else {
+      dupWarning.style.display = 'none';
+      btnSubmit.disabled = false;
+      btnSubmit.style.opacity = '1';
+    }
+
+    document.querySelector('#form-thname').value = item.thname;
+    document.querySelector('#form-gender').value = item.gender;
+    document.querySelector('#gender-select').value = item.gender;
+    document.querySelector('#form-sat').value = item.sat_sum;
+    document.querySelector('#form-sha').value = item.sha_sum;
+    document.querySelector('#form-euphony').value = item.euphony_score;
+    document.querySelector('#form-ease').value = item.pronunciation_ease;
+    document.querySelector('#form-rhythm').value = item.rhythm_score;
+
+    document.querySelector('#preview-sat').textContent = item.sat_sum;
+    document.querySelector('#preview-sha').textContent = item.sha_sum;
+    document.querySelector('#preview-euphony').textContent = item.euphony_score;
+    document.querySelector('#preview-ease').textContent = item.pronunciation_ease;
+
+    const satPairsBox = document.querySelector('#preview-sat-pairs');
+    satPairsBox.innerHTML = '';
+    (item.sat_pairs || []).forEach(p => {
+      const span = document.createElement('span');
+      span.className = 'pair-badge pair-green';
+      span.textContent = p;
+      satPairsBox.appendChild(span);
+    });
+
+    const shaPairsBox = document.querySelector('#preview-sha-pairs');
+    shaPairsBox.innerHTML = '';
+    (item.sha_pairs || []).forEach(p => {
+      const span = document.createElement('span');
+      span.className = 'pair-badge pair-green';
+      span.textContent = p;
+      shaPairsBox.appendChild(span);
+    });
+
+    const daysBox = document.querySelector('#preview-days');
+    daysBox.innerHTML = '';
+    (item.days || []).forEach(d => {
+      const span = document.createElement('span');
+      span.className = 'day-badge ' + (d.is_kakis ? 'day-kakis' : 'day-safe');
+      span.textContent = d.day_th + (d.is_kakis ? ' (ติดกาลกิณี)' : ' (มงคล)');
+      daysBox.appendChild(span);
+    });
+
+    if (item.meaning) {
+      document.querySelector('#form-meaning').value = item.meaning;
+    }
+  } catch (err) {
+    alert('เกิดข้อผิดพลาดในการเชื่อมต่อ: ' + err.message);
+  } finally {
+    spinner.style.display = 'none';
+    btn.disabled = false;
+  }
+}
+</script>
+</main></body></html>{{end}}

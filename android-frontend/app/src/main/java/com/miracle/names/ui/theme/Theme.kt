@@ -22,7 +22,7 @@ val DarkColorScheme = darkColorScheme(
 )
 
 private val LightColorScheme = lightColorScheme(
-    primary = PurpleHeader,
+    primary = GreenHeader,
     onPrimary = Color.White,
     secondary = GoldPrimary,
     background = Color(0xFFF1EDF4),
@@ -39,6 +39,12 @@ val SarabunFontFamily = FontFamily(
     Font(R.font.sarabun_medium, FontWeight.Medium),
     Font(R.font.sarabun_semibold, FontWeight.SemiBold),
     Font(R.font.sarabun_bold, FontWeight.Bold)
+)
+
+val PromptFontFamily = FontFamily(
+    Font(R.font.prompt_medium, FontWeight.Medium),
+    Font(R.font.prompt_semibold, FontWeight.SemiBold),
+    Font(R.font.prompt_bold, FontWeight.Bold)
 )
 
 private val SarabunTypography = Typography().withFontFamily(SarabunFontFamily)
@@ -63,10 +69,10 @@ private fun Typography.withFontFamily(fontFamily: FontFamily): Typography = copy
 
 @Composable
 fun MiracleNamesTheme(
-    darkTheme: Boolean = isSystemInDarkTheme(),
+    darkTheme: Boolean = true,
     content: @Composable () -> Unit
 ) {
-    val colorScheme = if (darkTheme) DarkColorScheme else LightColorScheme
+    val colorScheme = DarkColorScheme
 
     MaterialTheme(
         colorScheme = colorScheme,

@@ -1,0 +1,13 @@
+{
+  "name": "ชื่อดี-ตั้งชื่อมงคล",
+  "short_name": "ชื่อดี",
+  "lang": "th",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#140B07",
+  "theme_color": "#140B07",
+  "icons": [
+    { "src": "/images/app_logo-256.png", "sizes": "256x256", "type": "image/png", "purpose": "any" },
+    { "src": "/images/app_logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

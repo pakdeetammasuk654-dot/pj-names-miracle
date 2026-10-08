@@ -1,8 +1,10 @@
 package com.miracle.names.ui.blessing
 
+import android.app.Activity
 import android.widget.Toast
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -13,24 +15,23 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.icons.filled.AutoAwesome
-import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Share
-import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asAndroidBitmap
+import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -41,6 +42,7 @@ import coil.request.CachePolicy
 import coil.request.ImageRequest
 import com.miracle.names.R
 import com.miracle.names.data.model.NameResultItem
+import com.miracle.names.data.remote.MiracleApiConfig
 import com.miracle.names.ui.theme.*
 import com.miracle.names.utils.ImageUtils
 import com.miracle.names.viewmodel.AppliedSearchSnapshot
@@ -50,6 +52,9 @@ import dev.shreyaspatil.capturable.controller.rememberCaptureController
 import kotlinx.coroutines.launch
 import java.util.Locale
 import androidx.compose.runtime.ExperimentalComposeApi
+import androidx.compose.material.icons.filled.BugReport
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
 import kotlin.math.roundToInt
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalComposeUiApi::class, ExperimentalComposeApi::class)
@@ -58,11 +63,13 @@ fun BlessingCardScreen(
     item: NameResultItem? = null,
     snapshot: AppliedSearchSnapshot,
     viewModel: NameSearchViewModel,
-    onBackClick: () -> Unit = { viewModel.selectNameForBlessingCard(null) }
+    onBackClick: () -> Unit = { viewModel.selectNameForBlessingCard(null) },
+    onOpenDebugPurchase: (() -> Unit)? = null
 ) {
     val selectedItem = item ?: viewModel.selectedItem.collectAsState().value
     val dayOfBirth = snapshot.dayOfBirth
     val context = LocalContext.current
+    val isUnlocked by viewModel.isUnlocked.collectAsState()
     val scope = rememberCoroutineScope()
     val captureController = rememberCaptureController()
     var useLocalBuddhaImage by remember(dayOfBirth) { mutableStateOf(false) }
@@ -71,7 +78,7 @@ fun BlessingCardScreen(
     val buddhaImageData = if (useLocalBuddhaImage) {
         localBuddhaImageResId
     } else {
-        "http://10.0.2.2:8080/buddhas/${buddhaImageFileNameFor(dayOfBirth)}?v=${System.currentTimeMillis()}"
+        "${MiracleApiConfig.assetUrl("buddhas/${buddhaImageFileNameFor(dayOfBirth)}")}?v=${System.currentTimeMillis()}"
     }
     val buddhaImageRequest = remember(dayOfBirth, useLocalBuddhaImage) {
         ImageRequest.Builder(context)
@@ -80,10 +87,23 @@ fun BlessingCardScreen(
             .diskCachePolicy(CachePolicy.DISABLED)
             .build()
     }
+    var buddhaImageLoaded by remember(dayOfBirth, useLocalBuddhaImage) { mutableStateOf(false) }
+
+    var selectedTheme by remember { mutableStateOf(WallpaperTheme.EMERALD) }
+
+    val wallpaperBgRequest = remember(selectedTheme) {
+        ImageRequest.Builder(context)
+            .data("${MiracleApiConfig.assetUrl("images/${selectedTheme.bgFileName}")}?v=${System.currentTimeMillis()}")
+            .error(selectedTheme.fallbackResId)
+            .placeholder(selectedTheme.fallbackResId)
+            .memoryCachePolicy(CachePolicy.DISABLED)
+            .diskCachePolicy(CachePolicy.DISABLED)
+            .build()
+    }
 
     val frogLeftImageRequest = remember {
         ImageRequest.Builder(context)
-            .data("http://10.0.2.2:8080/images/frog_left.png?v=${System.currentTimeMillis()}")
+            .data("${MiracleApiConfig.assetUrl("images/frog_left.png")}?v=${System.currentTimeMillis()}")
             .error(R.drawable.frog_left)
             .placeholder(R.drawable.frog_left)
             .memoryCachePolicy(CachePolicy.DISABLED)
@@ -93,7 +113,7 @@ fun BlessingCardScreen(
 
     val goldRightImageRequest = remember {
         ImageRequest.Builder(context)
-            .data("http://10.0.2.2:8080/images/gold.png?v=${System.currentTimeMillis()}")
+            .data("${MiracleApiConfig.assetUrl("images/gold.png")}?v=${System.currentTimeMillis()}")
             .error(R.drawable.gold)
             .placeholder(R.drawable.gold)
             .memoryCachePolicy(CachePolicy.DISABLED)
@@ -112,28 +132,18 @@ fun BlessingCardScreen(
         ),
         label = "halo_pulse"
     )
-    val starRotation by infiniteTransition.animateFloat(
-        initialValue = 0f,
-        targetValue = 360f,
-        animationSpec = infiniteRepeatable(
-            animation = tween(6000, easing = LinearEasing),
-            repeatMode = RepeatMode.Restart
-        ),
-        label = "star_rotate"
-    )
-
     Scaffold(
         topBar = {
             TopAppBar(
                 title = {
                     Row(verticalAlignment = Alignment.CenterVertically) {
-                        Icon(
-                            imageVector = Icons.Default.AutoAwesome,
-                            contentDescription = null,
-                            tint = GoldPrimary,
+                        Image(
+                            painter = painterResource(id = R.drawable.app_logo),
+                            contentDescription = "โลโก้ชื่อดี",
                             modifier = Modifier
-                                .size(20.dp)
-                                .rotate(starRotation)
+                                .size(30.dp)
+                                .clip(CircleShape)
+                                .border(1.dp, GoldPrimary.copy(alpha = 0.6f), CircleShape)
                         )
                         Spacer(modifier = Modifier.width(8.dp))
                         Text(
@@ -152,7 +162,18 @@ fun BlessingCardScreen(
                         )
                     }
                 },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkBackground)
+                actions = {
+                    onOpenDebugPurchase?.let { openDebug ->
+                        IconButton(onClick = openDebug) {
+                            Icon(
+                                imageVector = Icons.Default.BugReport,
+                                contentDescription = "เมนู Debug purchase",
+                                tint = GoldLight
+                            )
+                        }
+                    }
+                },
+                colors = TopAppBarDefaults.topAppBarColors(containerColor = GreenHeader)
             )
         },
         containerColor = DarkBackground
@@ -168,10 +189,11 @@ fun BlessingCardScreen(
             }
         } else {
             val selectedName = selectedItem
-            val fullName = snapshot.fullName(selectedName.thName)
-            val goldCardText = Color(0xFF2B123A)
-            val goldCardSecondaryText = Color(0xFF3B253F)
-            val goldCardDivider = Color(0xFF8F6721).copy(alpha = 0.34f)
+            val rawFullName = snapshot.fullName(selectedName.thName)
+            val fullName = viewModel.getDisplayName(rawFullName)
+            val goldCardText = selectedTheme.nameTextColor
+            val goldCardSecondaryText = selectedTheme.meaningTextColor
+            val goldCardDivider = selectedTheme.dividerColor
 
             Box(
                 modifier = Modifier
@@ -186,7 +208,7 @@ fun BlessingCardScreen(
                         .background(
                             Brush.radialGradient(
                                 colors = listOf(
-                                    PurpleAccent.copy(alpha = 0.28f),
+                                    GreenHeader.copy(alpha = 0.38f),
                                     GoldPrimary.copy(alpha = 0.15f),
                                     Color.Transparent
                                 ),
@@ -204,65 +226,127 @@ fun BlessingCardScreen(
                     horizontalAlignment = Alignment.CenterHorizontally,
                     verticalArrangement = Arrangement.Top
                 ) {
-                    // MAIN CAPTURABLE BLESSING CARD
+                    if (!isUnlocked) {
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 16.dp),
+                            shape = RoundedCornerShape(14.dp),
+                            color = GoldPrimary,
+                            contentColor = Color(0xFF123322),
+                            shadowElevation = 5.dp
+                        ) {
+                            Row(
+                                modifier = Modifier.padding(horizontal = 14.dp, vertical = 11.dp),
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(9.dp)
+                            ) {
+                                Text("🔒", fontSize = 16.sp)
+                                Text(
+                                    text = "ตัวอย่างการ์ด · เปิดชื่อทั้งหมดเพื่อสร้างแรงดึงดูด",
+                                    modifier = Modifier.weight(1f),
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis
+                                )
+                                TextButton(
+                                    onClick = { viewModel.unlockAllNames(context as? Activity) },
+                                    colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF123322)),
+                                    contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
+                                ) {
+                                    Text("เปิดชื่อ", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                }
+                            }
+                        }
+                    }
+
+                    val nameFontSize = remember(fullName) {
+                        when {
+                            fullName.length >= 26 -> 13.sp
+                            fullName.length >= 21 -> 15.sp
+                            fullName.length >= 16 -> 17.sp
+                            fullName.length >= 11 -> 19.sp
+                            else -> 23.sp
+                        }
+                    }
+
+                    // THEME SELECTOR PILLS
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(bottom = 12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        WallpaperTheme.values().forEach { theme ->
+                            val isSelected = theme == selectedTheme
+                            Surface(
+                                onClick = { selectedTheme = theme },
+                                shape = RoundedCornerShape(20.dp),
+                                color = if (isSelected) GoldPrimary else CardBgDark,
+                                contentColor = if (isSelected) Color(0xFF1B1405) else GoldLight,
+                                border = BorderStroke(
+                                    1.dp,
+                                    if (isSelected) GoldLight else GoldPrimary.copy(alpha = 0.35f)
+                                ),
+                                modifier = Modifier.weight(1f)
+                            ) {
+                                Box(
+                                    modifier = Modifier.padding(vertical = 8.dp, horizontal = 4.dp),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = theme.title,
+                                        fontSize = 11.5.sp,
+                                        fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Medium,
+                                        maxLines = 1
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // MAIN CAPTURABLE BLESSING CARD / WALLPAPER (Optimized for 9:19.5 smartphone screens)
                     BoxWithConstraints(
                         modifier = Modifier
                             .fillMaxWidth()
-                            .aspectRatio(9f / 16f)
+                            .aspectRatio(9f / 19.5f)
                             .capturable(captureController)
-                            .clip(RoundedCornerShape(24.dp))
-                            .background(
-                                brush = Brush.verticalGradient(
-                                    colors = listOf(
-                                        Color(0xFFFFFBEB), // Soft Warm Sunlight Gold
-                                        Color(0xFFFDE047), // Radiant Amber Gold
-                                        Color(0xFFD97706), // Imperial Gold
-                                        Color(0xFF78350F), // Deep Warm Bronze
-                                        Color(0xFF38154C)  // Royal Purple Base Accent
-                                    )
-                                ),
-                                shape = RoundedCornerShape(24.dp)
-                            )
-                            .border(
-                                border = BorderStroke(
-                                    width = 2.5.dp,
-                                    brush = Brush.linearGradient(
-                                        listOf(
-                                            GoldPrimary,
-                                            Color(0xFFF472B6),
-                                            Color(0xFFA855F7),
-                                            GoldPrimary
-                                        )
-                                    )
-                                ),
-                                shape = RoundedCornerShape(24.dp)
-                            )
-                            .padding(3.dp)
-                            .border(
-                                width = 1.dp,
-                                color = Color(0xFFFFFDF0),
-                                shape = RoundedCornerShape(21.dp)
-                            )
-                            .padding(14.dp)
+                            .background(Color(0xFFFBF8F0))
                     ) {
+                        // Dynamic Wallpaper Background (served from Go backend)
+                        AsyncImage(
+                            model = wallpaperBgRequest,
+                            contentDescription = "ภาพพื้นหลังวอลเปเปอร์มงคล",
+                            modifier = Modifier.matchParentSize(),
+                            contentScale = ContentScale.Crop
+                        )
+
+                        val isTuesday = remember(dayOfBirth) { dayOfBirth.equals("tuesday", ignoreCase = true) }
+                        val tuesdayBoxSize = maxWidth * 0.90f
+                        val tuesdayYOffset = maxHeight * 0.32f - (tuesdayBoxSize * 0.655f)
+
+                        val haloWidth = if (isTuesday) maxWidth * 0.88f else maxWidth * 0.62f
+                        val haloHeight = if (isTuesday) (tuesdayBoxSize * 0.50f) else maxHeight * 0.28f
+
                         // Background Radiant Halo behind Buddha Statue
                         Box(
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = (buddhaImageTopPaddingFor(dayOfBirth) - 8.dp).coerceAtLeast(0.dp))
-                                .size(
-                                    width = maxWidth * 0.62f,
-                                    height = maxHeight * 0.38f
-                                )
+                            modifier = (if (isTuesday) {
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .offset(y = tuesdayYOffset + (tuesdayBoxSize * 0.25f))
+                                    .size(width = haloWidth, height = haloHeight)
+                            } else {
+                                Modifier
+                                    .align(Alignment.TopCenter)
+                                    .padding(top = maxHeight * 0.05f)
+                                    .size(width = haloWidth, height = haloHeight)
+                            })
                                 .scale(pulseScale)
                                 .background(
                                     Brush.radialGradient(
-                                        colors = listOf(
-                                            Color(0xFFFFFDF0).copy(alpha = 0.85f),
-                                            Color(0xFFFDE68A).copy(alpha = 0.55f),
-                                            Color(0xFFF59E0B).copy(alpha = 0.20f),
-                                            Color.Transparent
-                                        )
+                                        colors = selectedTheme.haloColors
                                     )
                                 )
                         )
@@ -273,21 +357,54 @@ fun BlessingCardScreen(
                             infiniteTransition = infiniteTransition
                         )
 
+                        val isStandingBuddha = remember(dayOfBirth) {
+                            dayOfBirth.equals("sunday", ignoreCase = true) ||
+                            dayOfBirth.equals("monday", ignoreCase = true) ||
+                            dayOfBirth.equals("friday", ignoreCase = true)
+                        }
+
+                        val buddhaImageModifier = if (isTuesday) {
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .offset(y = tuesdayYOffset)
+                                .size(tuesdayBoxSize)
+                        } else {
+                            Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = if (isStandingBuddha) maxHeight * 0.035f else maxHeight * 0.05f)
+                                .size(
+                                    width = if (isStandingBuddha) maxWidth * 0.54f else maxWidth * 0.52f,
+                                    height = if (isStandingBuddha) maxHeight * 0.28f else maxHeight * 0.27f
+                                )
+                        }
+
+                        if (!buddhaImageLoaded && !buddhaImageUnavailable) {
+                            BuddhaLightCirclePlaceholder(
+                                modifier = buddhaImageModifier,
+                                infiniteTransition = infiniteTransition
+                            )
+                        }
+
                         // Buddha Image for Day of Birth
+                        val buddhaImageAlpha by animateFloatAsState(
+                            targetValue = if (buddhaImageLoaded) 1f else 0f,
+                            animationSpec = tween(520, easing = FastOutSlowInEasing),
+                            label = "buddha_image_fade_in"
+                        )
                         AsyncImage(
                             model = buddhaImageRequest,
                             contentDescription = "พระประจำวัน${formatDayThai(dayOfBirth)}",
-                            modifier = Modifier
-                                .align(Alignment.TopCenter)
-                                .padding(top = buddhaImageTopPaddingFor(dayOfBirth))
-                                .size(
-                                    width = maxWidth * 0.52f,
-                                    height = maxHeight * 0.36f
-                                ),
+                            modifier = buddhaImageModifier,
                             contentScale = ContentScale.Fit,
-                            alpha = 1f,
-                            onSuccess = { buddhaImageUnavailable = false },
+                            alignment = if (isTuesday) Alignment.BottomCenter else Alignment.Center,
+                            alpha = buddhaImageAlpha,
+                            onLoading = { buddhaImageLoaded = false },
+                            onSuccess = {
+                                buddhaImageLoaded = true
+                                buddhaImageUnavailable = false
+                            },
                             onError = {
+                                buddhaImageLoaded = false
                                 if (!useLocalBuddhaImage) {
                                     useLocalBuddhaImage = true
                                 } else {
@@ -310,24 +427,33 @@ fun BlessingCardScreen(
                             fullName.length >= 26 -> 13.sp
                             fullName.length >= 21 -> 15.sp
                             fullName.length >= 16 -> 17.sp
-                            fullName.length >= 11 -> 20.sp
-                            else -> 24.sp
+                            fullName.length >= 11 -> 19.sp
+                            else -> 23.sp
                         }
+                        val blessingOrnamentWidth = maxWidth * 0.25f
+                        val blessingOrnamentHeight = maxHeight * 0.105f
 
-                        // INNER BLESSING CONTAINER (ORIGINAL CLEAN DESIGN)
+                        // INNER BLESSING CONTAINER (POSITIONED DIRECTLY UNDERNEATH THE BUDDHA STATUE)
                         Column(
                             modifier = Modifier
-                                .align(Alignment.Center)
-                                .fillMaxWidth(0.82f)
-                                .widthIn(max = 310.dp)
+                                .align(Alignment.TopCenter)
+                                .padding(top = maxHeight * 0.32f)
+                                .fillMaxWidth(0.88f)
+                                .widthIn(max = 340.dp)
+                                .shadow(
+                                    elevation = if (selectedTheme == WallpaperTheme.IVORY) 8.dp else 4.dp,
+                                    shape = RoundedCornerShape(22.dp),
+                                    ambientColor = Color(0x333D270C),
+                                    spotColor = Color(0x333D270C)
+                                )
                                 .clip(RoundedCornerShape(22.dp))
-                                .background(Color(0xFFFFF8DD).copy(alpha = 0.72f))
+                                .background(Brush.verticalGradient(selectedTheme.cardBackgroundColors))
                                 .border(
                                     width = 1.dp,
-                                    color = Color(0xFFFFE88A).copy(alpha = 0.70f),
+                                    brush = Brush.verticalGradient(selectedTheme.cardBorderColors),
                                     shape = RoundedCornerShape(22.dp)
                                 )
-                                .padding(horizontal = 14.dp, vertical = 20.dp),
+                                .padding(horizontal = 14.dp, vertical = 12.dp),
                             horizontalAlignment = Alignment.CenterHorizontally,
                             verticalArrangement = Arrangement.Center
                         ) {
@@ -342,20 +468,20 @@ fun BlessingCardScreen(
                                 overflow = TextOverflow.Ellipsis
                             )
 
-                            Spacer(modifier = Modifier.height(12.dp))
+                            Spacer(modifier = Modifier.height(6.dp))
 
                             // Meaning Display
                             Text(
                                 text = selectedName.meaning.ifBlank { "ยังไม่มีข้อมูลความหมายของชื่อนี้ในฐานข้อมูล" },
                                 color = goldCardSecondaryText,
                                 fontWeight = FontWeight.Medium,
-                                fontSize = 14.sp,
-                                lineHeight = 20.sp,
+                                fontSize = 13.sp,
+                                lineHeight = 18.sp,
                                 textAlign = TextAlign.Center
                             )
 
                             HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 12.dp),
+                                modifier = Modifier.padding(vertical = 7.dp),
                                 color = goldCardDivider
                             )
 
@@ -363,7 +489,7 @@ fun BlessingCardScreen(
                             Column(
                                 modifier = Modifier.fillMaxWidth(),
                                 horizontalAlignment = Alignment.CenterHorizontally,
-                                verticalArrangement = Arrangement.spacedBy(8.dp)
+                                verticalArrangement = Arrangement.spacedBy(2.dp)
                             ) {
                                 Text(
                                     text = if (snapshot.policy.kalakiniScope == "not_applied") {
@@ -371,24 +497,23 @@ fun BlessingCardScreen(
                                     } else {
                                         "ผู้นี้เกิด${formatDayThai(dayOfBirth)} ไร้กาลกิณี"
                                     },
-                                    color = Color(0xFF145A2B),
+                                    color = selectedTheme.kalakiniTextColor,
                                     fontWeight = FontWeight.SemiBold,
-                                    fontSize = 13.sp,
+                                    fontSize = 12.5.sp,
                                     textAlign = TextAlign.Center
                                 )
 
                                 Text(
-                                    text = "✦ ดีทั้งเลขศาสตร์และพลังเงา ✦",
-                                    color = Color(0xFF8B5E14),
+                                    text = "✦ เลขศาสตร์นำพา พลังเงาเกื้อหนุน ✦",
+                                    color = selectedTheme.quoteTextColor,
                                     fontWeight = FontWeight.Bold,
-                                    fontSize = 12.sp,
-                                    textAlign = TextAlign.Center,
-                                    modifier = Modifier.padding(top = 2.dp)
+                                    fontSize = 11.5.sp,
+                                    textAlign = TextAlign.Center
                                 )
                             }
 
                             HorizontalDivider(
-                                modifier = Modifier.padding(vertical = 12.dp),
+                                modifier = Modifier.padding(vertical = 7.dp),
                                 color = goldCardDivider
                             )
 
@@ -411,58 +536,63 @@ fun BlessingCardScreen(
                                 color = goldCardSecondaryText,
                                 onPairClick = { pair -> viewModel.fetchPairDetail(pair) }
                             )
+
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(top = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.Bottom
+                            ) {
+                                AsyncImage(
+                                    model = frogLeftImageRequest,
+                                    contentDescription = "คางคกทองคำมงคลด้านซ้าย",
+                                    modifier = Modifier.size(
+                                        width = blessingOrnamentWidth,
+                                        height = blessingOrnamentHeight
+                                    ),
+                                    contentScale = ContentScale.Fit,
+                                    alpha = 0.88f
+                                )
+
+                                AsyncImage(
+                                    model = goldRightImageRequest,
+                                    contentDescription = "กองเงินกองทองด้านขวา",
+                                    modifier = Modifier.size(
+                                        width = blessingOrnamentWidth,
+                                        height = blessingOrnamentHeight
+                                    ),
+                                    contentScale = ContentScale.Fit,
+                                    alpha = 0.88f
+                                )
+                            }
                         }
 
-                        // Decorative Frog Statue - Bottom Left (Overlapping text container for 3D depth)
-                        AsyncImage(
-                            model = frogLeftImageRequest,
-                            contentDescription = "คางคกทองคำมงคลด้านซ้าย",
+                        // Brand footer
+                        Box(
                             modifier = Modifier
-                                .align(Alignment.BottomStart)
-                                .offset(x = (-12).dp, y = 12.dp)
-                                .size(
-                                    width = maxWidth * 0.54f,
-                                    height = maxHeight * 0.32f
-                                ),
-                            contentScale = ContentScale.Fit
-                        )
-
-                        // Decorative Gold & Treasure Image - Bottom Right (Overlapping text container for 3D depth)
-                        AsyncImage(
-                            model = goldRightImageRequest,
-                            contentDescription = "กองเงินกองทองด้านขวา",
-                            modifier = Modifier
-                                .align(Alignment.BottomEnd)
-                                .offset(x = 12.dp, y = 12.dp)
-                                .size(
-                                    width = maxWidth * 0.54f,
-                                    height = maxHeight * 0.32f
-                                ),
-                            contentScale = ContentScale.Fit
-                        )
+                                .align(Alignment.BottomCenter)
+                                .fillMaxWidth()
+                                .padding(bottom = 14.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(
+                                text = "ชื่อดี.com",
+                                color = selectedTheme.footerTextColor,
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
                     }
 
+                    Spacer(modifier = Modifier.height(20.dp))
 
+                    var showSaveOptionDialog by remember { mutableStateOf(false) }
+                    val socialCaptureController = rememberCaptureController()
 
-                    Spacer(modifier = Modifier.height(16.dp))
-
-                    // SHARE & SAVE BUTTON
+                    // SAVE & WALLPAPER ACTION BUTTON
                     Button(
-                        onClick = {
-                            scope.launch {
-                                try {
-                                    val bitmap = captureController.captureAsync().await()
-                                    val success = ImageUtils.saveBitmapToGallery(context, bitmap.asAndroidBitmap())
-                                    if (success) {
-                                        Toast.makeText(context, "บันทึกรูปลงเครื่องสำเร็จ!", Toast.LENGTH_SHORT).show()
-                                    } else {
-                                        Toast.makeText(context, "เกิดข้อผิดพลาดในการบันทึกรูปภาพ", Toast.LENGTH_SHORT).show()
-                                    }
-                                } catch (_: Throwable) {
-                                    Toast.makeText(context, "ไม่สามารถจับภาพหน้าจอได้", Toast.LENGTH_SHORT).show()
-                                }
-                            }
-                        },
+                        onClick = { showSaveOptionDialog = true },
                         modifier = Modifier
                             .fillMaxWidth()
                             .height(52.dp),
@@ -493,13 +623,287 @@ fun BlessingCardScreen(
                                 )
                                 Spacer(modifier = Modifier.width(10.dp))
                                 Text(
-                                    text = "บันทึกภาพการ์ดชื่อดี",
+                                    text = "บันทึกภาพ/แชร์",
                                     color = Color.Black,
                                     fontWeight = FontWeight.Bold,
                                     fontSize = 15.sp
                                 )
                             }
                         }
+                    }
+
+                    // Off-screen 1:1 Social Blessing Card for Instagram / Facebook / Social Sharing
+                    val socialCanvasSize = 420.dp
+                    Box(
+                        modifier = Modifier
+                            .offset(x = 6000.dp)
+                            .requiredSize(socialCanvasSize)
+                            .capturable(socialCaptureController)
+                            .background(Color(0xFFFBF8F0))
+                    ) {
+                        // 1:1 Social Card Content
+                        AsyncImage(
+                            model = wallpaperBgRequest,
+                            contentDescription = null,
+                            modifier = Modifier.matchParentSize(),
+                            contentScale = ContentScale.Crop
+                        )
+
+                        val isTuesday = remember(dayOfBirth) { dayOfBirth.equals("tuesday", ignoreCase = true) }
+                        val isStandingBuddha = remember(dayOfBirth) {
+                            dayOfBirth.equals("sunday", ignoreCase = true) ||
+                            dayOfBirth.equals("monday", ignoreCase = true) ||
+                            dayOfBirth.equals("friday", ignoreCase = true)
+                        }
+
+                        val sTuesdayBoxSize = socialCanvasSize * 0.58f
+                        val sTuesdayYOffset = socialCanvasSize * 0.25f - (sTuesdayBoxSize * 0.655f)
+                        val sBuddhaWidth = if (isTuesday) sTuesdayBoxSize else (if (isStandingBuddha) socialCanvasSize * 0.35f else socialCanvasSize * 0.33f)
+                        val sBuddhaHeight = if (isTuesday) sTuesdayBoxSize else (if (isStandingBuddha) socialCanvasSize * 0.25f else socialCanvasSize * 0.23f)
+                        val sBuddhaTopPadding = if (isTuesday) sTuesdayYOffset else (if (isStandingBuddha) socialCanvasSize * 0.015f else socialCanvasSize * 0.022f)
+
+                        // Top Buddha Statue
+                        AsyncImage(
+                            model = buddhaImageRequest,
+                            contentDescription = null,
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = sBuddhaTopPadding)
+                                .size(width = sBuddhaWidth, height = sBuddhaHeight),
+                            contentScale = ContentScale.Fit,
+                            alignment = if (isTuesday) Alignment.BottomCenter else Alignment.Center
+                        )
+
+                        // Inner Card
+                        Column(
+                            modifier = Modifier
+                                .align(Alignment.TopCenter)
+                                .padding(top = socialCanvasSize * 0.245f)
+                                .fillMaxWidth(0.91f)
+                                .height(socialCanvasSize * 0.73f)
+                                .shadow(
+                                    elevation = if (selectedTheme == WallpaperTheme.IVORY) 6.dp else 3.dp,
+                                    shape = RoundedCornerShape(18.dp),
+                                    ambientColor = Color(0x333D270C),
+                                    spotColor = Color(0x333D270C)
+                                )
+                                .clip(RoundedCornerShape(18.dp))
+                                .background(Brush.verticalGradient(selectedTheme.cardBackgroundColors))
+                                .border(
+                                    width = 1.2.dp,
+                                    brush = Brush.verticalGradient(selectedTheme.cardBorderColors),
+                                    shape = RoundedCornerShape(18.dp)
+                                )
+                                .padding(horizontal = 14.dp, vertical = 2.dp),
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                            verticalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(
+                                horizontalAlignment = Alignment.CenterHorizontally,
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Text(
+                                    text = fullName,
+                                    color = goldCardText,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = nameFontSize,
+                                    textAlign = TextAlign.Center,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.padding(top = 14.dp)
+                                )
+
+                                Text(
+                                    text = selectedName.meaning.ifBlank { "ยังไม่มีข้อมูลความหมายของชื่อนี้ในฐานข้อมูล" },
+                                    color = goldCardSecondaryText,
+                                    fontSize = 11.5.sp,
+                                    lineHeight = 15.sp,
+                                    fontWeight = FontWeight.Medium,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(top = 3.dp, start = 4.dp, end = 4.dp)
+                                )
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 2.5.dp),
+                                    color = goldCardDivider
+                                )
+
+                                Text(
+                                    text = "ผู้นี้เกิด${formatDayThai(dayOfBirth)} ไร้กาลกิณี",
+                                    color = selectedTheme.kalakiniTextColor,
+                                    fontWeight = FontWeight.SemiBold,
+                                    fontSize = 11.sp,
+                                    textAlign = TextAlign.Center
+                                )
+
+                                Text(
+                                    text = "✦ เลขศาสตร์นำพา พลังเงาเกื้อหนุน ✦",
+                                    color = selectedTheme.quoteTextColor,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 10.sp,
+                                    textAlign = TextAlign.Center,
+                                    modifier = Modifier.padding(top = 1.dp)
+                                )
+
+                                HorizontalDivider(
+                                    modifier = Modifier.padding(vertical = 2.5.dp),
+                                    color = goldCardDivider
+                                )
+
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(3.dp),
+                                    horizontalAlignment = Alignment.CenterHorizontally,
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    BlessingNumberMeaningBlock(
+                                        pairsText = selectedName.satPairsDisplay,
+                                        pairTypesText = selectedName.satPairType,
+                                        description = selectedName.satMiracleDesc.ifBlank { "ไม่มีคำอธิบายคู่เลขในฐานข้อมูล" },
+                                        color = goldCardText,
+                                        circleSize = 30.dp,
+                                        fontSize = 13.sp,
+                                        descFontSize = 11.5.sp,
+                                        strokeWidth = 1.5.dp,
+                                        onPairClick = { pair -> viewModel.fetchPairDetail(pair) }
+                                    )
+
+                                    BlessingNumberMeaningBlock(
+                                        pairsText = selectedName.shaPairsDisplay,
+                                        pairTypesText = selectedName.shaPairType,
+                                        description = selectedName.shaMiracleDesc.ifBlank { "ไม่มีคำอธิบายคู่เลขในฐานข้อมูล" },
+                                        color = goldCardSecondaryText,
+                                        circleSize = 30.dp,
+                                        fontSize = 13.sp,
+                                        descFontSize = 11.5.sp,
+                                        strokeWidth = 1.5.dp,
+                                        onPairClick = { pair -> viewModel.fetchPairDetail(pair) }
+                                    )
+                                }
+                            }
+
+                            // Bottom Frog, Gold & Brand
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(start = 4.dp, end = 4.dp, bottom = 4.dp),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                AsyncImage(
+                                    model = frogLeftImageRequest,
+                                    contentDescription = "คางคกทองคำมงคลด้านซ้าย",
+                                    modifier = Modifier.size(width = 68.dp, height = 44.dp),
+                                    contentScale = ContentScale.Fit,
+                                    alpha = 0.95f
+                                )
+
+                                Text(
+                                    text = "ชื่อดี.com",
+                                    color = selectedTheme.footerTextColor,
+                                    fontSize = 11.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+
+                                AsyncImage(
+                                    model = goldRightImageRequest,
+                                    contentDescription = "กองเงินกองทองด้านขวา",
+                                    modifier = Modifier.size(width = 68.dp, height = 44.dp),
+                                    contentScale = ContentScale.Fit,
+                                    alpha = 0.95f
+                                )
+                            }
+                        }
+                    }
+
+                    if (showSaveOptionDialog) {
+                        AlertDialog(
+                            onDismissRequest = { showSaveOptionDialog = false },
+                            title = {
+                                Text(
+                                    text = "เลือกวิธีใช้การ์ดมงคล",
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 17.sp,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
+                            },
+                            text = {
+                                Column(
+                                    verticalArrangement = Arrangement.spacedBy(10.dp),
+                                    modifier = Modifier.fillMaxWidth()
+                                ) {
+                                    Text(
+                                        text = "คุณสามารถเก็บภาพไว้ใน Photos หรือแชร์ผ่านแอปที่ติดตั้งอยู่",
+                                        fontSize = 14.sp,
+                                        color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.8f)
+                                    )
+                                    
+                                    Button(
+                                        onClick = {
+                                            showSaveOptionDialog = false
+                                            scope.launch {
+                                                try {
+                                                    val bitmap = captureController.captureAsync().await()
+                                                    val androidBitmap = bitmap.asAndroidBitmap()
+                                                    val saved = ImageUtils.saveBitmapToGallery(context, androidBitmap)
+                                                    if (saved) {
+                                                        Toast.makeText(context, "บันทึกรูปลงคลังภาพสำเร็จ!", Toast.LENGTH_SHORT).show()
+                                                    } else {
+                                                        Toast.makeText(context, "เกิดข้อผิดพลาดในการบันทึกรูปภาพ", Toast.LENGTH_SHORT).show()
+                                                    }
+                                                } catch (_: Throwable) {
+                                                    Toast.makeText(context, "ไม่สามารถจับภาพได้", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = GoldPrimary),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(48.dp),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text(
+                                            text = "🖼️  บันทึกเป็นรูปภาพ",
+                                            color = Color.Black,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp
+                                        )
+                                    }
+
+                                    Button(
+                                        onClick = {
+                                            showSaveOptionDialog = false
+                                            scope.launch {
+                                                try {
+                                                    val bitmap = socialCaptureController.captureAsync().await()
+                                                    val cardBitmap = bitmap.asAndroidBitmap()
+                                                    ImageUtils.shareImage(context, cardBitmap)
+                                                } catch (_: Throwable) {
+                                                    Toast.makeText(context, "ไม่สามารถแชร์การ์ดรูปภาพได้", Toast.LENGTH_SHORT).show()
+                                                }
+                                            }
+                                        },
+                                        colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF1877F2)),
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .height(48.dp),
+                                        shape = RoundedCornerShape(12.dp)
+                                    ) {
+                                        Text(
+                                            text = "📲  แชร์ไปยังโซเชียล",
+                                            color = Color.White,
+                                            fontWeight = FontWeight.Bold,
+                                            fontSize = 15.sp
+                                        )
+                                    }
+                                }
+                            },
+                            confirmButton = {},
+                            dismissButton = {
+                                TextButton(onClick = { showSaveOptionDialog = false }) {
+                                    Text("ยกเลิก", color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.7f), fontSize = 14.sp)
+                                }
+                            }
+                        )
                     }
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -564,6 +968,76 @@ private fun CardSparkleCanvas(modifier: Modifier, infiniteTransition: InfiniteTr
     }
 }
 
+@Composable
+private fun BuddhaLightCirclePlaceholder(
+    modifier: Modifier,
+    infiniteTransition: InfiniteTransition
+) {
+    val glowAlpha by infiniteTransition.animateFloat(
+        initialValue = 0.32f,
+        targetValue = 0.90f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1500, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "buddha_light_circle_glow"
+    )
+    val ringScale by infiniteTransition.animateFloat(
+        initialValue = 0.72f,
+        targetValue = 1.18f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(2300, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "buddha_light_circle_ring"
+    )
+
+    Canvas(modifier = modifier) {
+        val minSide = size.minDimension
+        val center = Offset(size.width * 0.5f, size.height * 0.44f)
+        val gold = Color(0xFFFFF3B0)
+        val softWhite = Color(0xFFFFFDF0)
+        val amber = Color(0xFFF59E0B)
+
+        drawCircle(
+            color = amber.copy(alpha = glowAlpha * 0.12f),
+            radius = minSide * 0.54f,
+            center = center
+        )
+        drawCircle(
+            color = gold.copy(alpha = glowAlpha * 0.24f),
+            radius = minSide * 0.40f,
+            center = center
+        )
+        drawCircle(
+            color = softWhite.copy(alpha = glowAlpha * 0.32f),
+            radius = minSide * 0.22f,
+            center = center
+        )
+        drawCircle(
+            color = gold.copy(alpha = glowAlpha * 0.42f),
+            radius = minSide * 0.42f * ringScale,
+            center = center,
+            style = Stroke(width = 2.4.dp.toPx())
+        )
+        drawCircle(
+            color = softWhite.copy(alpha = glowAlpha * 0.78f),
+            radius = minSide * 0.030f,
+            center = Offset(size.width * 0.50f, size.height * 0.44f)
+        )
+        drawCircle(
+            color = softWhite.copy(alpha = glowAlpha * 0.58f),
+            radius = minSide * 0.016f,
+            center = Offset(size.width * 0.34f, size.height * 0.25f)
+        )
+        drawCircle(
+            color = gold.copy(alpha = glowAlpha * 0.62f),
+            radius = minSide * 0.014f,
+            center = Offset(size.width * 0.68f, size.height * 0.32f)
+        )
+    }
+}
+
 
 
 private fun formatDayThai(day: String): String {
@@ -589,6 +1063,10 @@ private fun BlessingNumberMeaningBlock(
     pairTypesText: String,
     description: String,
     color: Color,
+    circleSize: androidx.compose.ui.unit.Dp = 36.dp,
+    fontSize: androidx.compose.ui.unit.TextUnit = 14.sp,
+    descFontSize: androidx.compose.ui.unit.TextUnit = 12.sp,
+    strokeWidth: androidx.compose.ui.unit.Dp = 2.dp,
     onPairClick: ((String) -> Unit)? = null
 ) {
     val descriptionLines = remember(description) { splitBlessingDescriptions(description) }
@@ -596,7 +1074,7 @@ private fun BlessingNumberMeaningBlock(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(vertical = 4.dp),
+            .padding(vertical = 2.dp),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         if (label != null) {
@@ -613,6 +1091,10 @@ private fun BlessingNumberMeaningBlock(
             com.miracle.names.ui.results.PairCircles(
                 pairsStr = pairsText,
                 typesStr = pairTypesText,
+                circleSize = circleSize,
+                fontSize = fontSize,
+                strokeWidth = strokeWidth,
+                spacing = 6.dp,
                 onPairClick = onPairClick
             )
         } else {
@@ -623,20 +1105,20 @@ private fun BlessingNumberMeaningBlock(
             )
         }
 
-        Spacer(modifier = Modifier.height(4.dp))
+        Spacer(modifier = Modifier.height(3.dp))
 
         Column(
             modifier = Modifier.fillMaxWidth(),
             horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(2.dp)
+            verticalArrangement = Arrangement.spacedBy(1.dp)
         ) {
             descriptionLines.forEach { line ->
                 Text(
                     text = line,
                     color = color,
-                    fontSize = 12.sp,
+                    fontSize = descFontSize,
                     textAlign = TextAlign.Center,
-                    lineHeight = 17.sp,
+                    lineHeight = 16.sp,
                     modifier = Modifier.fillMaxWidth()
                 )
             }
@@ -681,4 +1163,110 @@ private fun buddhaImageTopPaddingFor(day: String): androidx.compose.ui.unit.Dp {
         "tuesday" -> 4.dp
         else -> 18.dp
     }
+}
+
+enum class WallpaperTheme(
+    val id: String,
+    val title: String,
+    val bgFileName: String,
+    val fallbackResId: Int,
+    val cardBackground: Color,
+    val cardBackgroundColors: List<Color>,
+    val cardBorderColors: List<Color>,
+    val nameTextColor: Color,
+    val meaningTextColor: Color,
+    val kalakiniTextColor: Color,
+    val quoteTextColor: Color,
+    val dividerColor: Color,
+    val footerTextColor: Color,
+    val outerBorderColors: List<Color>,
+    val haloColors: List<Color>
+) {
+    IVORY(
+        id = "ivory",
+        title = "✨ ทองคำ",
+        bgFileName = "blessing_wallpaper_bg_ivory.jpg",
+        fallbackResId = R.drawable.blessing_wallpaper_bg_ivory,
+        cardBackground = Color(0xFFF3E4C2).copy(alpha = 0.95f),
+        cardBackgroundColors = listOf(
+            Color(0xFFF9F0D9).copy(alpha = 0.95f),
+            Color(0xFFEBD8AA).copy(alpha = 0.95f)
+        ),
+        cardBorderColors = listOf(
+            Color(0xFFF7E5BC),
+            Color(0xFFD4AF37).copy(alpha = 0.85f),
+            Color(0xFFE8D3A2)
+        ),
+        nameTextColor = Color(0xFF24170A),
+        meaningTextColor = Color(0xFF503D2A),
+        kalakiniTextColor = Color(0xFF1E582D),
+        quoteTextColor = Color(0xFF7A5012),
+        dividerColor = Color(0xFFC4A255).copy(alpha = 0.45f),
+        footerTextColor = Color(0xFF6B4918),
+        outerBorderColors = listOf(Color(0xFFFFF8DE), Color(0xFFDFB86C), Color(0xFFFFF8DE)),
+        haloColors = listOf(
+            Color(0xFFFFF2D0).copy(alpha = 0.78f),
+            Color(0xFFF6D88E).copy(alpha = 0.45f),
+            Color(0xFFE2AE48).copy(alpha = 0.18f),
+            Color.Transparent
+        )
+    ),
+    EMERALD(
+        id = "emerald",
+        title = "🌿 เขียวมรกต",
+        bgFileName = "blessing_wallpaper_bg_emerald.jpg",
+        fallbackResId = R.drawable.blessing_wallpaper_bg_emerald,
+        cardBackground = Color(0xFF072718).copy(alpha = 0.88f),
+        cardBackgroundColors = listOf(
+            Color(0xFF072718).copy(alpha = 0.88f),
+            Color(0xFF051D12).copy(alpha = 0.88f)
+        ),
+        cardBorderColors = listOf(
+            Color(0xFFFFE082),
+            Color(0xFF81C784).copy(alpha = 0.60f),
+            Color(0xFFFFD54F)
+        ),
+        nameTextColor = Color(0xFFFFDF7D),
+        meaningTextColor = Color(0xFFE0F2E9),
+        kalakiniTextColor = Color(0xFF81C784),
+        quoteTextColor = Color(0xFFFFD54F),
+        dividerColor = Color(0xFFD4AF37).copy(alpha = 0.35f),
+        footerTextColor = Color(0xFFFFDF7D).copy(alpha = 0.90f),
+        outerBorderColors = listOf(Color(0xFFFFDF7D), Color(0xFF1B5E20), Color(0xFFFFDF7D)),
+        haloColors = listOf(
+            Color(0xFFFFDF7D).copy(alpha = 0.70f),
+            Color(0xFF81C784).copy(alpha = 0.35f),
+            Color(0xFF072718).copy(alpha = 0.10f),
+            Color.Transparent
+        )
+    ),
+    MIDNIGHT(
+        id = "midnight",
+        title = "🪐 จักรวาลมงคล",
+        bgFileName = "blessing_wallpaper_bg_midnight.jpg",
+        fallbackResId = R.drawable.blessing_wallpaper_bg_midnight,
+        cardBackground = Color(0xFF090E1D).copy(alpha = 0.88f),
+        cardBackgroundColors = listOf(
+            Color(0xFF090E1D).copy(alpha = 0.88f),
+            Color(0xFF060914).copy(alpha = 0.88f)
+        ),
+        cardBorderColors = listOf(
+            Color(0xFFFFDF7D),
+            Color(0xFFD4AF37).copy(alpha = 0.65f),
+            Color(0xFFFFDF7D)
+        ),
+        nameTextColor = Color(0xFFFFDF7D),
+        meaningTextColor = Color(0xFFF0EBE1),
+        kalakiniTextColor = Color(0xFF81C784),
+        quoteTextColor = Color(0xFFFFD54F),
+        dividerColor = Color(0xFFD4AF37).copy(alpha = 0.35f),
+        footerTextColor = Color(0xFFFFDF7D).copy(alpha = 0.90f),
+        outerBorderColors = listOf(Color(0xFFFFDF7D), Color(0xFF1B284F), Color(0xFFFFDF7D)),
+        haloColors = listOf(
+            Color(0xFFFFE599).copy(alpha = 0.85f),
+            Color(0xFF6B8AFF).copy(alpha = 0.35f),
+            Color(0xFF090E1D).copy(alpha = 0.10f),
+            Color.Transparent
+        )
+    )
 }

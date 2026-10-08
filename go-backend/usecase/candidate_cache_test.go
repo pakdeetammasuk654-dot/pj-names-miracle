@@ -93,7 +93,7 @@ func TestCandidatePoolCacheDefensivelyCopiesMutableData(t *testing.T) {
 	}
 }
 
-func TestSearchTokenReranksPreparedPoolWithoutRepositoryCalls(t *testing.T) {
+func TestSearchTokenReranksPreparedPoolWithOnlyTopMeaningLookup(t *testing.T) {
 	repo := &countingNameRepository{
 		numbers: map[string]domain.NumberMeaning{
 			"24": {PairType: "D10", PairPoint: 80},
@@ -145,7 +145,7 @@ func TestSearchTokenReranksPreparedPoolWithoutRepositoryCalls(t *testing.T) {
 	if initial.CandidateToken == "" {
 		t.Fatal("expected an opaque candidate token")
 	}
-	if initial.Policy.PairScope != "first_name_all_d_pairs" ||
+	if initial.Policy.PairScope != "first_name_all_known_pairs_scored" ||
 		initial.Policy.KalakiniScope != "not_applied" ||
 		initial.Policy.SoundScope != "first_name" ||
 		initial.Policy.NumerologyRuleVersion != domain.NumerologyRuleVersion ||
@@ -187,8 +187,8 @@ func TestSearchTokenReranksPreparedPoolWithoutRepositoryCalls(t *testing.T) {
 	if !reranked.CandidateVectorProvenanceVerified || reranked.CandidateVectorProvenanceSource != "approved_snapshot" {
 		t.Fatalf("rerank lost cached candidate-vector provenance: verified=%v source=%q", reranked.CandidateVectorProvenanceVerified, reranked.CandidateVectorProvenanceSource)
 	}
-	if calls := repo.callCount(); calls != repositoryCallsAfterSearch {
-		t.Fatalf("rerank made repository calls: before=%d after=%d", repositoryCallsAfterSearch, calls)
+	if calls := repo.callCount(); calls != repositoryCallsAfterSearch+1 {
+		t.Fatalf("rerank should make only one Top-N meaning lookup: before=%d after=%d", repositoryCallsAfterSearch, calls)
 	}
 }
 
@@ -391,6 +391,29 @@ func TestWishCandidateQueriesAreExhaustiveBeforeRanking(t *testing.T) {
 	}
 }
 
+func TestPrototypeNameAndMeaningQueryRemainSeparate(t *testing.T) {
+	repo := &countingNameRepository{
+		numbers:    map[string]domain.NumberMeaning{"24": {PairType: "D10", PairPoint: 80}},
+		candidates: []domain.NameResultItem{{NameID: 1, THName: "ณเดช", SatSum: 24, ShaSum: 24}},
+	}
+	uc := NewNameSearchUseCase(repo)
+	_, err := uc.SearchTopNamesWithToken(context.Background(), domain.NameSearchRequest{
+		Mode:          domain.ModeStandalone,
+		PrototypeName: "ณเดชน์",
+		WishQuery:     "ผู้มีชัยชนะและสง่างาม",
+		IsNameIntent:  true,
+	})
+	if err != nil {
+		t.Fatalf("search: %v", err)
+	}
+
+	repo.mu.Lock()
+	defer repo.mu.Unlock()
+	if repo.lastPrototypeName != "ณเดชน์" || repo.lastMeaningQuery != "ผู้มีชัยชนะและสง่างาม" {
+		t.Fatalf("prototype and meaning were mixed: prototype=%q meaning=%q", repo.lastPrototypeName, repo.lastMeaningQuery)
+	}
+}
+
 type countingNameRepository struct {
 	mu                 sync.Mutex
 	calls              int
@@ -406,6 +429,8 @@ type countingNameRepository struct {
 	lastCandidateLimit int
 	lastSemanticLimit  int
 	lastSimilarLimit   int
+	lastPrototypeName  string
+	lastMeaningQuery   string
 }
 
 func (r *countingNameRepository) recordCall() {
@@ -463,6 +488,34 @@ func (r *countingNameRepository) GetSumsByTHName(context.Context, string) (int, 
 	return 0, 0, "", nil
 }
 
+func (r *countingNameRepository) GetMeaningsByNameIDs(_ context.Context, nameIDs []int) (map[int]string, error) {
+	r.recordCall()
+	wanted := make(map[int]bool, len(nameIDs))
+	for _, nameID := range nameIDs {
+		wanted[nameID] = true
+	}
+	result := make(map[int]string, len(nameIDs))
+	for _, item := range r.candidates {
+		if wanted[item.NameID] {
+			result[item.NameID] = item.Meaning
+		}
+	}
+	return result, nil
+}
+
+func TestEnrichResultMeaningsKeepsThaiFullNameOrder(t *testing.T) {
+	repo := &countingNameRepository{candidates: []domain.NameResultItem{{NameID: 1, Meaning: "ความหมายนามสกุล"}}}
+	uc := &nameSearchUseCase{repo: repo}
+	results := []domain.NameResultItem{{NameID: 1}}
+	req := domain.NameSearchRequest{Mode: domain.ModeCombined, SearchTarget: domain.TargetSurname}
+	if err := uc.enrichResultMeanings(context.Background(), results, req, "ความหมายชื่อตัว"); err != nil {
+		t.Fatalf("enrich result meanings: %v", err)
+	}
+	if results[0].Meaning != "ความหมายชื่อตัว ความหมายนามสกุล" {
+		t.Fatalf("full-name meaning order is wrong: %q", results[0].Meaning)
+	}
+}
+
 func (r *countingNameRepository) SearchCandidateNames(_ context.Context, _ []int, _ []int, _ string, _ string, limit int) ([]domain.NameResultItem, error) {
 	r.mu.Lock()
 	r.calls++
@@ -487,7 +540,32 @@ func (r *countingNameRepository) SearchSimilarNames(_ context.Context, _ []int, 
 	return cloneNameResults(r.candidates), nil
 }
 
+func (r *countingNameRepository) GetMeaningVectorByTHName(context.Context, string) (string, string, error) {
+	r.recordCall()
+	return "", "", nil
+}
+
+func (r *countingNameRepository) SearchSemanticAndSimilarNames(_ context.Context, _ []int, _ []int, prototypeName string, meaningQuery string, _ string, limit int) ([]domain.NameResultItem, error) {
+	r.mu.Lock()
+	r.calls++
+	r.lastSimilarLimit = limit // Reuse similar limit tracker for test purposes
+	r.lastPrototypeName = prototypeName
+	r.lastMeaningQuery = meaningQuery
+	r.mu.Unlock()
+	return cloneNameResults(r.candidates), nil
+}
+
 func (r *countingNameRepository) GetSampleNames(context.Context) ([]domain.Celebrity, error) {
 	r.recordCall()
 	return nil, nil
+}
+
+func (r *countingNameRepository) GetRandomMeanings(context.Context, int) ([]string, error) {
+	r.recordCall()
+	return nil, nil
+}
+
+func (r *countingNameRepository) SuggestNames(_ context.Context, _ string, _ int) ([]domain.NameResultItem, error) {
+	r.recordCall()
+	return cloneNameResults(r.candidates), nil
 }

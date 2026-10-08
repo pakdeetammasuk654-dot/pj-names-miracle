@@ -83,6 +83,48 @@ from deciding deep ties.
 - `migrations/000022_*` adds nullable per-row candidate-vector snapshot linkage,
   live approval checks, and append-only protection for approved semantic/sound
   evidence. Legacy vectors remain unlinked and therefore unavailable.
+- `migrations/000025_*` adds the immutable Thai phonetic normalization function.
+- `migrations/000026_*` ensures `pg_trgm` is installed and adds trigram indexes
+  for raw and phonetically normalized prototype-name similarity.
+- `migrations/000038_auspicious_rules.*` adds versioned, source-attributed
+  auspicious activities and composable JSONB rule expressions. Its conflict
+  policy is deterministic: exclusions win, and overlapping positive labels in
+  one signal group contribute only the highest-priority score.
+- `migrations/000039_auspicious_activity_catalog.*` makes name change/surname
+  creation the primary web activity and adds vehicle delivery, childbirth, and
+  ordination. Each activity declares whether its result uses a specific rule or
+  only the general rule set; childbirth also carries an explicit medical-safety
+  notice.
+- `migrations/000040_rename_isan_auspicious_rule_set.*` presents the initial
+  rules to users as `ฤกษ์วันมงคลตามตำราอีสาน`; the internally retained source URL
+  remains provenance for rule review and is not part of the user-facing label.
+- `migrations/000041_hide_name_change_scope_note.*` removes the internal scope
+  disclaimer from the name-change activity's user-facing guidance.
+- `migrations/000042_auspicious_rule_meanings.*` stores a short Thai meaning for
+  each rule so recommendation dropdowns can explain terms such as `อมุตโชค`
+  without hard-coding those meanings in the web page.
+- `migrations/000053_auspicious_admin_content.*` stores editable Taksa role
+  names, meanings, wheel descriptions, dynamic sentence templates, and the
+  search disclaimer. The authenticated `/admin/auspicious-content` page also
+  edits the existing activity, rule-set, and auspicious-rule display text.
+  These content writes are read on the next API request and do not require an
+  application restart; calculation conditions and scores remain code/data-rule
+  controlled rather than editorial fields.
+- `migrations/000043_auspicious_activity_categories.*` groups activities for a
+  practical chooser and adds brand naming, important documents, product or
+  website launch, and starting a new job. Product launch shares the existing
+  commerce-specific `ปุณณดิถี` rule.
+- `migrations/000044_merge_overlapping_auspicious_activities.*` simplifies the
+  chooser by folding important-document filing into name change/surname work
+  and product or website launches into business opening. The redundant legacy
+  activity rows remain stored but disabled so the change is reversible.
+- `migrations/000045_change_name_district_office_article.*` publishes the
+  researched Thai checklist for changing a personal name or surname at the
+  district registry, including official-source links and a clearly bounded
+  `ชื่อดี 4 มิติ` product recommendation.
+- `migrations/000046_change_name_article_seo_image.*` replaces the generic app
+  logo on that guide with an optimized 1200×630 editorial WebP cover and a
+  search-snippet-length excerpt.
 - `manual/000023_enforce_canonical_pairs_after_cleanup.sql` is deliberately
   outside the automatic migration sequence. It validates preconditions before
   adding canonical uniqueness.

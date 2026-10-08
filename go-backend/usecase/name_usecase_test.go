@@ -200,6 +200,44 @@ func TestNameSearchUseCase_SemanticUnavailableIsHonestAndExhaustive(t *testing.T
 	t.Logf("content_audit latin_digit_or_whitespace=%d outside_thai_block=%d", latinDigitOrSpaceCount, outsideThaiBlockCount)
 }
 
+func TestNameSearchUseCase_PrototypeNameImpliedNameIntent(t *testing.T) {
+	db, err := config.InitDB()
+	if err != nil {
+		t.Skipf("Skipping integration test: %v", err)
+	}
+	defer db.Close()
+
+	repo := repository.NewNameRepository(db)
+	uc := usecase.NewNameSearchUseCase(repo)
+	zero := 0.0
+	one := 1.0
+	result, err := uc.SearchTopNamesWithToken(context.Background(), domain.NameSearchRequest{
+		Mode:             domain.ModeStandalone,
+		DayOfBirth:       "sunday",
+		PrototypeName:    "ณเดชน์",
+		Limit:            10,
+		NumerologyWeight: &zero,
+		SemanticWeight:   &zero,
+		SoundWeight:      &zero,
+		SimilarityWeight: &one,
+	})
+	if err != nil {
+		t.Fatalf("prototype-name similarity search: %v", err)
+	}
+	if len(result.Data) == 0 {
+		t.Fatal("expected prototype-name similarity results")
+	}
+	if result.RequestedWeights.Similarity != 1 || result.AppliedWeights.Similarity != 1 {
+		t.Fatalf("expected similarity-only weights, requested=%+v applied=%+v", result.RequestedWeights, result.AppliedWeights)
+	}
+	for _, item := range result.Data {
+		if item.SimilarityScore > 0 {
+			return
+		}
+	}
+	t.Fatalf("prototype_name without is_name_intent did not populate similarity scores: top=%+v", result.Data[0])
+}
+
 func TestNameSearchUseCase_ScreenshotLikeRankingFingerprint(t *testing.T) {
 	db, err := config.InitDB()
 	if err != nil {
@@ -338,7 +376,7 @@ func TestNameSearchUseCase_CombinedSundayRankingFingerprint(t *testing.T) {
 	if len(result.Data) != 100 {
 		t.Fatalf("expected exact Top 100, got %d", len(result.Data))
 	}
-	if result.Policy.PairScope != "first_name_and_combined_all_d_pairs" {
+	if result.Policy.PairScope != "first_name_all_d_and_combined_all_d_pairs" {
 		t.Fatalf("combined pair gate is not explicit: %q", result.Policy.PairScope)
 	}
 	if result.SemanticAvailable || result.AppliedWeights.Semantic != 0 ||

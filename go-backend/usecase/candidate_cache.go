@@ -22,6 +22,7 @@ type cachedCandidatePool struct {
 	request          domain.NameSearchRequest
 	surnameSatSum    int
 	surnameShaSum    int
+	surnameMeaning   string
 	goodNumbers      map[string]domain.NumberMeaning
 	soundCalibration domain.SoundCalibrationProfile
 	semanticCorpus   domain.SemanticCorpusProvenance
@@ -163,6 +164,7 @@ func cloneSearchRequest(req domain.NameSearchRequest) domain.NameSearchRequest {
 	cloned.NumerologyWeight = cloneFloat(req.NumerologyWeight)
 	cloned.SemanticWeight = cloneFloat(req.SemanticWeight)
 	cloned.SoundWeight = cloneFloat(req.SoundWeight)
+	cloned.SimilarityWeight = cloneFloat(req.SimilarityWeight)
 	return cloned
 }
 
@@ -181,6 +183,10 @@ func cloneNameResults(results []domain.NameResultItem) []domain.NameResultItem {
 		if results[i].RankingReasons != nil {
 			cloned[i].RankingReasons = append([]string(nil), results[i].RankingReasons...)
 		}
+		cloned[i].SatPairs = append([]domain.PairPresentation(nil), results[i].SatPairs...)
+		cloned[i].ShaPairs = append([]domain.PairPresentation(nil), results[i].ShaPairs...)
+		cloned[i].CandidateSatPairs = append([]domain.PairPresentation(nil), results[i].CandidateSatPairs...)
+		cloned[i].CandidateShaPairs = append([]domain.PairPresentation(nil), results[i].CandidateShaPairs...)
 	}
 	return cloned
 }

@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /admin/
+Disallow: /api/
+Disallow: /chat-uploads/
+Disallow: /local/
+
+Sitemap: https://xn--b3cu8e7ah6h.com/sitemap.xml

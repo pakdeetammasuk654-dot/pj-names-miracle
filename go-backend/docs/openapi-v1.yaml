@@ -1,0 +1,347 @@
+openapi: 3.1.0
+info:
+  title: Chue Dee Ranking API
+  version: 1.0.0
+  description: Stable native-client contract for Android and iOS. Every response includes X-API-Version and X-Ranking-Contract-Version headers.
+servers:
+  - url: https://xn--b3cu8e7ah6h.com/api/v1
+paths:
+  /readiness:
+    get:
+      summary: Verify database, cache warm-up, and contract versions
+      responses:
+        "200":
+          description: Ready to serve ranking requests
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/ReadinessResponse" }
+        "503":
+          description: Not ready; client should retry with backoff
+  /names/search:
+    post:
+      summary: Create a complete candidate pool and return ranked names
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NameSearchRequest" }
+      responses:
+        "200":
+          description: Ranked result and opaque rerank token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NameSearchResponse" }
+        "400": { description: Invalid request }
+  /names/rerank:
+    post:
+      summary: Rerank an existing in-memory candidate pool without DB or AI retrieval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/NameRerankRequest" }
+      responses:
+        "200":
+          description: Reranked result using the same candidate token
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/NameSearchResponse" }
+        "400": { description: Invalid weights or token }
+        "404": { description: Candidate token expired or was evicted }
+  /entitlements/verify:
+    post:
+      summary: Verify a native-store lifetime purchase and issue a short-lived entitlement
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/StorePurchaseRequest" }
+      responses:
+        "200":
+          description: Store-verified premium entitlement
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/EntitlementResponse" }
+        "401": { description: Purchase is invalid, inactive, revoked, or for another product }
+        "503": { description: Store verification credentials are not configured }
+  /auspicious-activities:
+    get:
+      summary: List activities currently supported by the auspicious-date engine
+      responses:
+        "200":
+          description: Activity choices for web and mobile clients
+  /auspicious/activities:
+    get:
+      summary: List activities currently supported by the auspicious-date engine (canonical)
+      responses:
+        "200":
+          description: Activity choices for web and mobile clients
+  /auspicious-search:
+    post:
+      summary: Rank auspicious dates for an activity within a Gregorian date range
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuspiciousSearchRequest" }
+      responses:
+        "200":
+          description: Up to three highest-scoring date recommendations, with database-backed Thai meanings for matched rules
+        "400": { description: Invalid activity, date range, or unavailable rules }
+  /auspicious/search:
+    post:
+      summary: Rank auspicious dates for an activity within a Gregorian date range (canonical)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/AuspiciousSearchRequest" }
+      responses:
+        "200":
+          description: Up to three highest-scoring date recommendations, with database-backed Thai meanings for matched rules
+        "400": { description: Invalid activity, date range, or unavailable rules }
+  /auspicious/calendar:
+    get:
+      summary: Get Gregorian month days mapped to Thai lunar calendar dates and observances
+      parameters:
+        - name: year
+          in: query
+          required: false
+          schema: { type: integer, example: 2026 }
+        - name: month
+          in: query
+          required: false
+          schema: { type: integer, example: 8 }
+      responses:
+        "200":
+          description: Monthly calendar days with Thai lunar details
+  /auspicious/taksa:
+    get:
+      summary: Calculate 9-step Taksa Jora, today's planetary wheel state, and individual role mappings
+      parameters:
+        - name: birth_date
+          in: query
+          required: false
+          schema: { type: string, format: date, example: "1982-07-10" }
+        - name: birth_time
+          in: query
+          required: false
+          schema: { type: string, example: "09:00" }
+        - name: target_date
+          in: query
+          required: false
+          schema: { type: string, format: date, example: "2026-08-26" }
+      responses:
+        "200":
+          description: Full Taksa Jora calculations with wheel rotation degrees and 8-role mapping
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaksaCalculationResponse" }
+    post:
+      summary: Calculate 9-step Taksa Jora with JSON body
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema: { $ref: "#/components/schemas/TaksaCalculationRequest" }
+      responses:
+        "200":
+          description: Full Taksa Jora calculations with wheel rotation degrees and 8-role mapping
+          content:
+            application/json:
+              schema: { $ref: "#/components/schemas/TaksaCalculationResponse" }
+components:
+  schemas:
+    TaksaCalculationRequest:
+      type: object
+      properties:
+        birth_date: { type: string, format: date }
+        birth_time: { type: string, example: "09:00" }
+        target_date: { type: string, format: date }
+    TaksaRoleItem:
+      type: object
+      properties:
+        role_name: { type: string }
+        day_name: { type: string }
+        day_code: { type: string }
+        planet_num: { type: integer }
+        symbol: { type: string }
+        score: { type: integer }
+        impact: { type: string }
+        description: { type: string }
+        meaning: { type: string }
+        auspicious_guidance: { type: string }
+    TaksaCalculationResponse:
+      type: object
+      properties:
+        is_today_default: { type: boolean }
+        birth_day_code: { type: string }
+        birth_day_name: { type: string }
+        birth_planet_num: { type: integer }
+        birth_time_shifted: { type: boolean }
+        full_age: { type: integer }
+        progressed_age: { type: integer }
+        is_center_cell: { type: boolean }
+        landed_planet_num: { type: integer }
+        landed_planet_name: { type: string }
+        landed_planet_symbol: { type: string }
+        landed_planet_code: { type: string }
+        wheel_rotation_degrees: { type: number }
+        hero_roles:
+          type: object
+          properties:
+            sri: { $ref: "#/components/schemas/TaksaRoleItem" }
+            dech: { $ref: "#/components/schemas/TaksaRoleItem" }
+            montri: { $ref: "#/components/schemas/TaksaRoleItem" }
+            kalakini: { $ref: "#/components/schemas/TaksaRoleItem" }
+        all_roles:
+          type: array
+          items: { $ref: "#/components/schemas/TaksaRoleItem" }
+    AuspiciousSearchRequest:
+      type: object
+      required: [activity_code, start_date, end_date]
+      properties:
+        activity_code: { type: string }
+        start_date: { type: string, format: date }
+        end_date: { type: string, format: date, description: Inclusive; range may not exceed 366 days }
+        birth_date: { type: string, format: date }
+        birth_time: { type: string }
+        prefer_weekend: { type: boolean, default: false }
+        avoid_wan_phra: { type: boolean, default: false }
+        monk_ceremony: { type: boolean, default: false }
+    RankingWeights:
+      type: object
+      required: [numerology, semantic, sound, similarity]
+      properties:
+        numerology: { type: number, minimum: 0, maximum: 1 }
+        semantic: { type: number, minimum: 0, maximum: 1 }
+        sound: { type: number, minimum: 0, maximum: 1 }
+        similarity: { type: number, minimum: 0, maximum: 1 }
+    NameSearchRequest:
+      type: object
+      required: [mode, numerology_weight, semantic_weight, sound_weight, similarity_weight]
+      properties:
+        mode: { type: string, enum: [standalone, combined, semantic] }
+        search_target: { type: string, enum: [first_name, surname], default: first_name }
+        surname: { type: string }
+        day_of_birth: { type: string }
+        prototype_name: { type: string, description: First name or surname used only for pg_trgm similarity }
+        wish_query: { type: string }
+        is_name_intent: { type: boolean, default: false }
+        limit: { type: integer, minimum: 1, maximum: 100, default: 100 }
+        numerology_weight: { type: number, minimum: 0, maximum: 1 }
+        semantic_weight: { type: number, minimum: 0, maximum: 1 }
+        sound_weight: { type: number, minimum: 0, maximum: 1 }
+        similarity_weight: { type: number, minimum: 0, maximum: 1 }
+    NameRerankRequest:
+      type: object
+      required: [candidate_token, numerology_weight, semantic_weight, sound_weight, similarity_weight]
+      properties:
+        candidate_token: { type: string, minLength: 1 }
+        limit: { type: integer, minimum: 1, maximum: 100, default: 100 }
+        numerology_weight: { type: number, minimum: 0, maximum: 1 }
+        semantic_weight: { type: number, minimum: 0, maximum: 1 }
+        sound_weight: { type: number, minimum: 0, maximum: 1 }
+        similarity_weight: { type: number, minimum: 0, maximum: 1 }
+    NameResultItem:
+      type: object
+      required: [name_id, thname, rank, final_score, has_bad_pair, bad_pair_count]
+      properties:
+        name_id: { type: integer }
+        thname: { type: string }
+        meaning: { type: string }
+        rank: { type: integer }
+        final_score: { type: number }
+        numerology_score: { type: number }
+        semantic_score: { type: number }
+        sound_score: { type: number }
+        similarity_score: { type: number }
+        sat_pairs_display: { type: string }
+        sha_pairs_display: { type: string }
+        sat_pairs:
+          type: array
+          items: { $ref: "#/components/schemas/PairPresentation" }
+        sha_pairs:
+          type: array
+          items: { $ref: "#/components/schemas/PairPresentation" }
+        candidate_sat_pairs:
+          type: array
+          items: { $ref: "#/components/schemas/PairPresentation" }
+        candidate_sha_pairs:
+          type: array
+          items: { $ref: "#/components/schemas/PairPresentation" }
+        sat_pairtype: { type: string }
+        sha_pairtype: { type: string }
+        has_bad_pair: { type: boolean }
+        bad_pair_count: { type: integer }
+        pair_risk_level: { type: string, enum: [strict, caution_r5, caution_r7] }
+        ranking_reasons:
+          type: array
+          items: { type: string }
+    PairPresentation:
+      type: object
+      required: [value, type, is_good]
+      properties:
+        value: { type: string, pattern: "^[0-9]{2}$" }
+        type: { type: string }
+        is_good: { type: boolean }
+    RankingPolicy:
+      type: object
+      required: [ranking_contract_version, pair_scope, numerology_rule_version, ranking_precision_version]
+      properties:
+        ranking_contract_version: { type: string, const: adaptive_pairs_v1 }
+        pair_scope: { type: string }
+        numerology_rule_version: { type: string }
+        ranking_precision_version: { type: string }
+        sound_formula_version: { type: string }
+        sound_calibration_approved: { type: boolean }
+        semantic_candidate_corpus_approved: { type: boolean }
+    NameSearchResponse:
+      type: object
+      required: [error, data, candidate_token, requested_weights, applied_weights, policy]
+      properties:
+        error: { type: boolean, const: false }
+        data:
+          type: array
+          items: { $ref: "#/components/schemas/NameResultItem" }
+        candidate_token: { type: string }
+        premium_unlocked: { type: boolean }
+        free_visible_count: { type: integer, const: 3 }
+        returned_count: { type: integer }
+        eligible_candidate_count: { type: integer }
+        requested_weights: { $ref: "#/components/schemas/RankingWeights" }
+        applied_weights: { $ref: "#/components/schemas/RankingWeights" }
+        policy: { $ref: "#/components/schemas/RankingPolicy" }
+    StorePurchaseRequest:
+      type: object
+      required: [platform, product_id]
+      properties:
+        platform: { type: string, enum: [android, ios] }
+        product_id: { type: string, const: premium_lifetime }
+        purchase_token: { type: string, description: Required for Android }
+        transaction_id: { type: string, description: Required for iOS }
+    EntitlementResponse:
+      type: object
+      required: [error, entitlement_token, product_id, platform, expires_at]
+      properties:
+        error: { type: boolean, const: false }
+        entitlement_token: { type: string }
+        product_id: { type: string, const: premium_lifetime }
+        platform: { type: string, enum: [android, ios] }
+        expires_at: { type: string, format: date-time }
+    ReadinessResponse:
+      type: object
+      required: [error, data]
+      properties:
+        error: { type: boolean }
+        data:
+          type: object
+          required: [status, api_version, ranking_contract_version, database_ready, sound_calibration_warm, sound_calibration_approved]
+          properties:
+            status: { type: string, enum: [READY, NOT_READY] }
+            api_version: { type: string, const: "1" }
+            ranking_contract_version: { type: string, const: adaptive_pairs_v1 }
+            database_ready: { type: boolean }
+            sound_calibration_warm: { type: boolean }
+            sound_calibration_approved: { type: boolean }
+            sound_calibration_source: { type: string }

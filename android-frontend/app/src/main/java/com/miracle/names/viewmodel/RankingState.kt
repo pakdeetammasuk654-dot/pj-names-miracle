@@ -3,23 +3,27 @@ package com.miracle.names.viewmodel
 import com.miracle.names.data.model.NameSearchPolicy
 import com.miracle.names.data.model.RankingWeightsPayload
 import kotlin.math.abs
+import kotlin.math.floor
 
 data class RankingWeights(
     val numerology: Float,
     val semantic: Float,
-    val sound: Float
+    val sound: Float,
+    val similarity: Float
 ) {
     fun approximatelyEquals(other: RankingWeights, tolerance: Float = 0.0001f): Boolean {
         return abs(numerology - other.numerology) <= tolerance &&
             abs(semantic - other.semantic) <= tolerance &&
-            abs(sound - other.sound) <= tolerance
+            abs(sound - other.sound) <= tolerance &&
+            abs(similarity - other.similarity) <= tolerance
     }
 
     companion object {
         val Default = RankingWeights(
-            numerology = 0.45f,
-            semantic = 0.35f,
-            sound = 0.20f
+            numerology = 0.35f,
+            semantic = 0.25f,
+            sound = 0.20f,
+            similarity = 0.20f
         )
     }
 }
@@ -33,6 +37,7 @@ data class AppliedSearchSnapshot(
     /** The normalized formula the backend actually applied to FinalScore. */
     val weights: RankingWeights,
     val count: Int,
+    val prototypeName: String = "",
     /** The user's selected formula before backend availability redistribution. */
     val requestedWeights: RankingWeights = weights,
     val eligibleCandidateCount: Int = count,
@@ -71,9 +76,6 @@ data class AppliedSearchSnapshot(
     fun semanticStatusThai(): String {
         if (semanticSource == "not_requested") {
             return "ไม่ได้ใช้คะแนนความหมายในการจัดอันดับครั้งนี้"
-        }
-        if (semanticSource == "trigram" || candidateVectorProvenanceSource == "not_applicable_trigram") {
-            return "ใช้ความคล้ายชื่อแบบข้อความ (ไม่ใช้เวกเตอร์คลังชื่อ)"
         }
         if (hasApprovedSemanticProof) {
             return "คะแนนความหมายผ่านการยืนยัน snapshot และที่มาเวกเตอร์"
@@ -146,18 +148,21 @@ internal const val MODE_COMBINED = "combined"
 internal fun normalizeRankingWeights(
     numerology: Float,
     semantic: Float,
-    sound: Float
+    sound: Float,
+    similarity: Float
 ): RankingWeights {
     val safeNumerology = numerology.coerceIn(0f, 1f)
     val safeSemantic = semantic.coerceIn(0f, 1f)
     val safeSound = sound.coerceIn(0f, 1f)
-    val total = safeNumerology + safeSemantic + safeSound
+    val safeSimilarity = similarity.coerceIn(0f, 1f)
+    val total = safeNumerology + safeSemantic + safeSound + safeSimilarity
     if (total <= 0f) return RankingWeights.Default
 
     return RankingWeights(
         numerology = safeNumerology / total,
         semantic = safeSemantic / total,
-        sound = safeSound / total
+        sound = safeSound / total,
+        similarity = safeSimilarity / total
     )
 }
 
@@ -184,9 +189,38 @@ internal fun resolveResponseWeights(
     fallback: RankingWeights
 ): RankingWeights {
     if (payload == null) return fallback
-    val total = payload.numerology + payload.semantic + payload.sound
+    val total = payload.numerology + payload.semantic + payload.sound + payload.similarity
     if (!total.isFinite() || total <= 0f) return fallback
-    return normalizeRankingWeights(payload.numerology, payload.semantic, payload.sound)
+    return normalizeRankingWeights(payload.numerology, payload.semantic, payload.sound, payload.similarity)
+}
+
+/** The ranking table must show the formula that produced its current ordering. */
+internal fun rankingDisplayWeights(snapshot: AppliedSearchSnapshot): RankingWeights = snapshot.weights
+
+internal fun rankingWeightPercents(weights: RankingWeights): IntArray {
+    val normalized = normalizeRankingWeights(
+        weights.numerology,
+        weights.semantic,
+        weights.sound,
+        weights.similarity
+    )
+    val raw = listOf(
+        normalized.numerology,
+        normalized.semantic,
+        normalized.sound,
+        normalized.similarity
+    ).map { it * 100f }
+    val result = raw.map { floor(it).toInt() }.toIntArray()
+    var remaining = 100 - result.sum()
+    raw.mapIndexed { index, value -> index to (value - floor(value)) }
+        .sortedByDescending { it.second }
+        .forEach { (index, _) ->
+            if (remaining > 0) {
+                result[index] += 1
+                remaining -= 1
+            }
+        }
+    return result
 }
 
 internal fun resolveEligibleCandidateCount(reportedCount: Int, resultCount: Int): Int {

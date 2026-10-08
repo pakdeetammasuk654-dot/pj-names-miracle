@@ -27,8 +27,11 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.miracle.names.ui.theme.DarkColorScheme
 import com.miracle.names.ui.theme.GoldLight
 import com.miracle.names.ui.theme.GoldPrimary
+import com.miracle.names.ui.theme.GreenHeader
+import com.miracle.names.ui.theme.GreenHeaderDark
 import com.miracle.names.ui.theme.PurpleAccent
 import com.miracle.names.ui.theme.PurpleDark
 import com.miracle.names.ui.theme.PurpleHeader
@@ -36,7 +39,8 @@ import kotlinx.coroutines.delay
 
 @Composable
 fun MagicalLoadingScreen() {
-    val isDark = isSystemInDarkTheme()
+    MaterialTheme(colorScheme = DarkColorScheme) {
+        val isDark = true
 
     val messages = remember {
         listOf(
@@ -91,14 +95,14 @@ fun MagicalLoadingScreen() {
         label = "shimmer"
     )
 
-    // Vibrant Iridescent Magical Shimmer Colors
-    val baseSkeletonColor = if (isDark) Color(0xFF2E1C3B) else Color(0xFFEDE7F3)
+    // Warm Gold & Louis Vuitton Luxury Shimmer Colors
+    val baseSkeletonColor = Color(0xFF160C08)
     val shimmerColors = listOf(
         baseSkeletonColor,
-        Color(0xFFE9D5FF).copy(alpha = 0.65f), // Soft Lavender Glow
-        Color(0xFFFDE68A).copy(alpha = 0.85f), // Radiant Gold
-        Color(0xFFF472B6).copy(alpha = 0.75f), // Vibrant Magenta/Pink
-        Color(0xFF818CF8).copy(alpha = 0.65f), // Celestial Indigo
+        Color(0xFF382014),
+        Color(0xFFFFDF85).copy(alpha = 0.55f),
+        Color(0xFFFFF0A3).copy(alpha = 0.70f),
+        Color(0xFFD4AF37).copy(alpha = 0.55f),
         baseSkeletonColor
     )
 
@@ -111,9 +115,9 @@ fun MagicalLoadingScreen() {
     val progressBrush = Brush.horizontalGradient(
         colors = listOf(
             GoldPrimary,
-            Color(0xFFEC4899),
-            Color(0xFF8B5CF6),
-            Color(0xFF06B6D4),
+            GoldLight,
+            Color(0xFFFFDF85),
+            Color(0xFFA37C10),
             GoldPrimary
         ),
         startX = shimmerOffset,
@@ -136,8 +140,8 @@ fun MagicalLoadingScreen() {
                 .background(
                     Brush.radialGradient(
                         colors = listOf(
-                            PurpleAccent.copy(alpha = if (isDark) 0.25f else 0.12f),
-                            GoldPrimary.copy(alpha = if (isDark) 0.15f else 0.08f),
+                            GoldPrimary.copy(alpha = 0.12f),
+                            Color(0xFF26160E).copy(alpha = 0.20f),
                             Color.Transparent
                         ),
                         center = Offset(500f, 100f),
@@ -184,6 +188,7 @@ fun MagicalLoadingScreen() {
         }
     }
 }
+}
 
 @Composable
 private fun MagicalStatusBanner(
@@ -195,15 +200,14 @@ private fun MagicalStatusBanner(
     Surface(
         modifier = Modifier.fillMaxWidth(),
         shape = RoundedCornerShape(18.dp),
-        color = PurpleHeader,
+        color = Color(0xFF160C08),
         shadowElevation = 6.dp,
         border = BorderStroke(
             1.5.dp,
             Brush.horizontalGradient(
                 listOf(
                     GoldPrimary,
-                    Color(0xFFF472B6),
-                    Color(0xFFA855F7),
+                    Color(0xFFFFF0A3),
                     GoldPrimary
                 )
             )
@@ -215,9 +219,9 @@ private fun MagicalStatusBanner(
                 .background(
                     Brush.linearGradient(
                         colors = listOf(
-                            PurpleDark,
-                            PurpleHeader,
-                            Color(0xFF4C1D95)
+                            Color(0xFF26160E),
+                            Color(0xFF160C08),
+                            Color(0xFF382014)
                         )
                     )
                 )
@@ -241,7 +245,7 @@ private fun MagicalStatusBanner(
                     Icon(
                         imageVector = Icons.Default.Star,
                         contentDescription = null,
-                        tint = Color(0xFFF472B6),
+                        tint = Color(0xFFFFF0A3),
                         modifier = Modifier
                             .size(14.dp)
                             .rotate(-rotation * 1.5f)
@@ -287,7 +291,7 @@ private fun MagicalStatusBanner(
 
 @Composable
 private fun MagicalTableHeaderSkeleton(shimmerBrush: Brush, isDark: Boolean) {
-    val headerBg = if (isDark) Color(0xFF271735) else Color(0xFFEFE8F5)
+    val headerBg = Color(0xFF1F120B)
     Row(
         modifier = Modifier
             .fillMaxWidth()
@@ -338,9 +342,9 @@ private fun MagicalSkeletonNameCard(
 ) {
     val shape = RoundedCornerShape(16.dp)
     val cardBg = if (isFirst) {
-        if (isDark) Color(0xFF3B234A) else Color(0xFFFFFBEB)
+        Color(0xFF26160E)
     } else {
-        if (isDark) Color(0xFF281A34) else Color(0xFFFFFFFF)
+        Color(0xFF160C08)
     }
 
     val borderModifier = if (isFirst) {
@@ -350,8 +354,8 @@ private fun MagicalSkeletonNameCard(
                 Brush.horizontalGradient(
                     listOf(
                         GoldPrimary,
-                        Color(0xFFF472B6),
-                        PurpleAccent
+                        Color(0xFFFFF0A3),
+                        GoldPrimary
                     )
                 )
             ),
@@ -361,7 +365,7 @@ private fun MagicalSkeletonNameCard(
         Modifier.border(
             BorderStroke(
                 0.8.dp,
-                if (isDark) Color(0xFF442D56) else Color(0xFFE8DFEE)
+                GoldPrimary.copy(alpha = 0.22f)
             ),
             shape
         )
@@ -388,7 +392,7 @@ private fun MagicalSkeletonNameCard(
             ) {
                 Text(
                     text = "#$rank",
-                    color = if (isFirst) GoldPrimary else (if (isDark) GoldLight.copy(alpha = 0.5f) else Color.Gray),
+                    color = if (isFirst) GoldPrimary else GoldLight.copy(alpha = 0.5f),
                     fontWeight = FontWeight.Bold,
                     fontSize = 14.sp
                 )
@@ -418,7 +422,7 @@ private fun MagicalSkeletonNameCard(
                                 .clip(RoundedCornerShape(8.dp))
                                 .background(
                                     Brush.horizontalGradient(
-                                        listOf(GoldPrimary.copy(alpha = 0.4f), Color(0xFFF472B6).copy(alpha = 0.4f))
+                                        listOf(GoldPrimary.copy(alpha = 0.4f), Color(0xFFFFF0A3).copy(alpha = 0.4f))
                                     )
                                 )
                         )
@@ -463,7 +467,7 @@ private fun MagicalSkeletonNameCard(
                     .background(
                         if (isFirst) {
                             Brush.linearGradient(
-                                listOf(GoldPrimary.copy(alpha = 0.35f), Color(0xFFF472B6).copy(alpha = 0.35f))
+                                listOf(GoldPrimary.copy(alpha = 0.35f), Color(0xFFFFF0A3).copy(alpha = 0.35f))
                             )
                         } else {
                             brush
@@ -504,19 +508,19 @@ private fun MagicalParticleBackground(infiniteTransition: InfiniteTransition) {
         )
         // Floating Sparkle 2 (Top Right)
         drawCircle(
-            color = Color(0xFFF472B6).copy(alpha = alpha2),
+            color = Color(0xFFFFDF85).copy(alpha = alpha2),
             radius = 8.dp.toPx(),
             center = Offset(size.width * 0.88f, size.height * 0.14f)
         )
         // Floating Sparkle 3 (Mid Right)
         drawCircle(
-            color = Color(0xFFA78BFA).copy(alpha = alpha1),
+            color = GoldPrimary.copy(alpha = alpha1),
             radius = 5.dp.toPx(),
             center = Offset(size.width * 0.92f, size.height * 0.45f)
         )
         // Floating Sparkle 4 (Lower Left)
         drawCircle(
-            color = Color(0xFF38BDF8).copy(alpha = alpha2),
+            color = Color(0xFFFFF0A3).copy(alpha = alpha2),
             radius = 7.dp.toPx(),
             center = Offset(size.width * 0.08f, size.height * 0.62f)
         )

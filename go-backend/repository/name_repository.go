@@ -8,8 +8,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"math"
+	"math/rand"
 	"net/http"
 	"os"
+	"regexp"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -19,8 +23,11 @@ import (
 )
 
 var (
-	vectorCache   = make(map[string]string)
-	vectorCacheMu sync.RWMutex
+	vectorCache           = make(map[string]string)
+	vectorCacheMu         sync.RWMutex
+	randomMeaningsCache   []string
+	randomMeaningsCacheMu sync.RWMutex
+	randomMeaningsCacheAt time.Time
 )
 
 const maxVectorCacheEntries = 256
@@ -33,10 +40,42 @@ type NameRepository interface {
 	GetSoundCalibrationProfile(ctx context.Context) (domain.SoundCalibrationProfile, error)
 	GetSemanticCorpusProvenance(ctx context.Context) (domain.SemanticCorpusProvenance, error)
 	GetSumsByTHName(ctx context.Context, thname string) (satSum int, shaSum int, meaning string, err error)
+	GetMeaningsByNameIDs(ctx context.Context, nameIDs []int) (map[int]string, error)
 	SearchCandidateNames(ctx context.Context, targetSatSums []int, targetShaSums []int, dayOfBirth string, wishQuery string, limit int) ([]domain.NameResultItem, error)
 	SearchSemanticWishNames(ctx context.Context, targetSatSums []int, targetShaSums []int, wishQuery string, dayOfBirth string, limit int) ([]domain.NameResultItem, error)
 	SearchSimilarNames(ctx context.Context, targetSatSums []int, targetShaSums []int, seedName string, dayOfBirth string, limit int) ([]domain.NameResultItem, error)
+	SuggestNames(ctx context.Context, seedName string, limit int) ([]domain.NameResultItem, error)
+	GetMeaningVectorByTHName(ctx context.Context, thname string) (vectorStr string, meaning string, err error)
+	SearchSemanticAndSimilarNames(ctx context.Context, targetSatSums []int, targetShaSums []int, seedName string, meaningQuery string, dayOfBirth string, limit int) ([]domain.NameResultItem, error)
 	GetSampleNames(ctx context.Context) ([]domain.Celebrity, error)
+	GetRandomMeanings(ctx context.Context, limit int) ([]string, error)
+}
+
+func (r *nameRepository) GetMeaningsByNameIDs(ctx context.Context, nameIDs []int) (map[int]string, error) {
+	result := make(map[int]string, len(nameIDs))
+	if len(nameIDs) == 0 {
+		return result, nil
+	}
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT name_id, COALESCE(meaning, '')
+		FROM names_miracle
+		WHERE name_id = ANY($1)`, pq.Array(nameIDs))
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch result meanings: %w", err)
+	}
+	defer rows.Close()
+	for rows.Next() {
+		var nameID int
+		var meaning string
+		if err := rows.Scan(&nameID, &meaning); err != nil {
+			return nil, fmt.Errorf("failed to scan result meaning: %w", err)
+		}
+		result[nameID] = meaning
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed while reading result meanings: %w", err)
+	}
+	return result, nil
 }
 
 // GetNameSumMaximums returns the real search range from names_miracle so the
@@ -44,10 +83,75 @@ type NameRepository interface {
 func (r *nameRepository) GetNameSumMaximums(ctx context.Context) (int, int, error) {
 	var maxSatSum, maxShaSum int
 	query := `SELECT COALESCE(MAX(sat_sum), 0), COALESCE(MAX(sha_sum), 0) FROM names_miracle`
-	if err := r.db.QueryRowContext(ctx, query).Scan(&maxSatSum, &maxShaSum); err != nil {
+	err := r.db.QueryRowContext(ctx, query).Scan(&maxSatSum, &maxShaSum)
+	if err != nil {
 		return 0, 0, fmt.Errorf("failed to get name sum maximums: %w", err)
 	}
 	return maxSatSum, maxShaSum, nil
+}
+
+// GetRandomMeanings returns distinct, non-empty meanings from an in-memory cache
+// refreshed periodically to eliminate constant DB table scan pressure.
+func (r *nameRepository) GetRandomMeanings(ctx context.Context, limit int) ([]string, error) {
+	if limit < 1 {
+		limit = 4
+	}
+	if limit > 108 {
+		limit = 108
+	}
+
+	randomMeaningsCacheMu.RLock()
+	hasValidCache := len(randomMeaningsCache) >= limit && time.Since(randomMeaningsCacheAt) < 30*time.Minute
+	if hasValidCache {
+		pool := make([]string, len(randomMeaningsCache))
+		copy(pool, randomMeaningsCache)
+		randomMeaningsCacheMu.RUnlock()
+
+		rand.Shuffle(len(pool), func(i, j int) {
+			pool[i], pool[j] = pool[j], pool[i]
+		})
+		return pool[:limit], nil
+	}
+	randomMeaningsCacheMu.RUnlock()
+
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT DISTINCT BTRIM(meaning)
+		FROM names_miracle
+		WHERE meaning IS NOT NULL AND BTRIM(meaning) <> ''
+		LIMIT 500`)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get random meanings: %w", err)
+	}
+	defer rows.Close()
+
+	meanings := make([]string, 0, 500)
+	for rows.Next() {
+		var meaning string
+		if err := rows.Scan(&meaning); err != nil {
+			return nil, fmt.Errorf("failed to scan random meaning: %w", err)
+		}
+		meanings = append(meanings, meaning)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to read random meanings: %w", err)
+	}
+
+	if len(meanings) > 0 {
+		randomMeaningsCacheMu.Lock()
+		randomMeaningsCache = meanings
+		randomMeaningsCacheAt = time.Now()
+		randomMeaningsCacheMu.Unlock()
+	}
+
+	pool := make([]string, len(meanings))
+	copy(pool, meanings)
+	rand.Shuffle(len(pool), func(i, j int) {
+		pool[i], pool[j] = pool[j], pool[i]
+	})
+	if len(pool) > limit {
+		pool = pool[:limit]
+	}
+	return pool, nil
 }
 
 // GetSoundCalibrationProfile prefers the latest approved immutable snapshot.
@@ -67,25 +171,17 @@ func (r *nameRepository) GetSoundCalibrationProfile(ctx context.Context) (domain
 		return domain.SoundCalibrationProfile{}, fmt.Errorf("failed to load approved sound calibration snapshot: %w", err)
 	}
 	var currentCorpus soundCorpusIdentity
-	currentCorpusLoaded := false
 	if found {
 		currentCorpus, err = r.loadCurrentSoundCorpusIdentity(ctx)
 		if err != nil {
 			return domain.SoundCalibrationProfile{}, fmt.Errorf("failed to validate approved sound calibration corpus: %w", err)
 		}
-		currentCorpusLoaded = true
 		found = approvedProfileMatchesCorpus(profile, currentCorpus)
 	}
 	if !found {
-		profile, err = r.loadLiveSoundCalibrationProfile(ctx)
+		profile, currentCorpus, err = r.loadLiveSoundCalibrationProfile(ctx)
 		if err != nil {
 			return domain.SoundCalibrationProfile{}, err
-		}
-		if !currentCorpusLoaded {
-			currentCorpus, err = r.loadCurrentSoundCorpusIdentity(ctx)
-			if err != nil {
-				return domain.SoundCalibrationProfile{}, fmt.Errorf("failed to fingerprint provisional sound corpus: %w", err)
-			}
 		}
 		if !soundProfileCountsMatchCorpus(profile, currentCorpus) {
 			return domain.SoundCalibrationProfile{}, errors.New("sound corpus changed while loading provisional calibration profile")
@@ -447,25 +543,18 @@ func isGovernanceSchemaUnavailable(err error) bool {
 	return code == "42P01" || code == "3F000" || code == "42703" // undefined table, schema, or legacy column
 }
 
-func (r *nameRepository) loadLiveSoundCalibrationProfile(ctx context.Context) (domain.SoundCalibrationProfile, error) {
+func (r *nameRepository) loadLiveSoundCalibrationProfile(ctx context.Context) (domain.SoundCalibrationProfile, soundCorpusIdentity, error) {
 	query := fmt.Sprintf(`
-		WITH scored AS (
-			SELECT
-				COALESCE(NULLIF(BTRIM(phonetic_version), ''), '<missing>') AS version,
-				(COALESCE(euphony_score, 0) * 0.45 +
-				 COALESCE(pronunciation_ease, 0) * 0.35 +
-				 COALESCE(rhythm_score, 0) * 0.20) AS sound_score
-			FROM names_miracle AS n
-			WHERE TRUE %s
-		)
-		SELECT version, COUNT(*), AVG(sound_score), STDDEV_SAMP(sound_score)
-		FROM scored
-		GROUP BY version
-		ORDER BY COUNT(*) DESC, version ASC
+		SELECT name_id, thname,
+			COALESCE(NULLIF(BTRIM(phonetic_version), ''), '<missing>') AS version,
+			COALESCE(euphony_score, 0), COALESCE(pronunciation_ease, 0), COALESCE(rhythm_score, 0)
+		FROM names_miracle AS n
+		WHERE TRUE %s
+		ORDER BY name_id ASC
 	`, candidateEligibilityClause(""))
 	rows, err := r.db.QueryContext(ctx, query)
 	if err != nil {
-		return domain.SoundCalibrationProfile{}, fmt.Errorf("failed to load live sound calibration statistics: %w", err)
+		return domain.SoundCalibrationProfile{}, soundCorpusIdentity{}, fmt.Errorf("failed to load live sound calibration corpus: %w", err)
 	}
 	defer rows.Close()
 
@@ -474,17 +563,62 @@ func (r *nameRepository) loadLiveSoundCalibrationProfile(ctx context.Context) (d
 		Source:         "live_repository_distribution_provisional",
 		Versions:       make(map[string]domain.SoundCalibrationStats),
 	}
+	identity := soundCorpusIdentity{VersionCounts: make(map[string]int64)}
+	digest := sha256.New()
+	encoder := json.NewEncoder(digest)
+	encoder.SetEscapeHTML(false)
+	accumulators := make(map[string]*soundStatsAccumulator)
 	for rows.Next() {
-		var version string
-		var count int64
-		var mean float64
-		var stdDev sql.NullFloat64
-		if err := rows.Scan(&version, &count, &mean, &stdDev); err != nil {
-			return domain.SoundCalibrationProfile{}, fmt.Errorf("failed to scan sound calibration statistics: %w", err)
+		var nameID int64
+		var thName, version string
+		var euphony, pronunciation, rhythm int
+		if err := rows.Scan(&nameID, &thName, &version, &euphony, &pronunciation, &rhythm); err != nil {
+			return domain.SoundCalibrationProfile{}, soundCorpusIdentity{}, fmt.Errorf("failed to scan live sound calibration corpus: %w", err)
 		}
-		stats := domain.SoundCalibrationStats{Count: count, Mean: mean}
-		if stdDev.Valid {
-			stats.StdDev = stdDev.Float64
+		if err := encoder.Encode(soundCorpusFingerprintRow{
+			NameID:            nameID,
+			THName:            thName,
+			PhoneticVersion:   version,
+			EuphonyScore:      euphony,
+			PronunciationEase: pronunciation,
+			RhythmScore:       rhythm,
+		}); err != nil {
+			return domain.SoundCalibrationProfile{}, soundCorpusIdentity{}, fmt.Errorf("encode sound corpus fingerprint row %d: %w", nameID, err)
+		}
+
+		identity.VersionCounts[version]++
+		identity.TotalCount++
+		soundScore := float64(euphony)*0.45 + float64(pronunciation)*0.35 + float64(rhythm)*0.20
+		acc, ok := accumulators[version]
+		if !ok {
+			acc = &soundStatsAccumulator{}
+			accumulators[version] = acc
+		}
+		acc.Add(soundScore)
+	}
+	if err := rows.Err(); err != nil {
+		return domain.SoundCalibrationProfile{}, soundCorpusIdentity{}, fmt.Errorf("failed while reading live sound calibration corpus: %w", err)
+	}
+	identity.FingerprintSHA256 = fmt.Sprintf("%x", digest.Sum(nil))
+
+	orderedVersions := make([]string, 0, len(accumulators))
+	for version := range accumulators {
+		orderedVersions = append(orderedVersions, version)
+	}
+	sort.Slice(orderedVersions, func(i, j int) bool {
+		left := accumulators[orderedVersions[i]]
+		right := accumulators[orderedVersions[j]]
+		if left.Count != right.Count {
+			return left.Count > right.Count
+		}
+		return orderedVersions[i] < orderedVersions[j]
+	})
+
+	for _, version := range orderedVersions {
+		acc := accumulators[version]
+		stats := domain.SoundCalibrationStats{Count: acc.Count, Mean: acc.Mean()}
+		if acc.Count > 1 {
+			stats.StdDev = acc.StdDev()
 		}
 		profile.Versions[version] = stats
 		if profile.ReferenceVersion == "" && stats.StdDev > 0 {
@@ -493,10 +627,31 @@ func (r *nameRepository) loadLiveSoundCalibrationProfile(ctx context.Context) (d
 			profile.ReferenceStdDev = stats.StdDev
 		}
 	}
-	if err := rows.Err(); err != nil {
-		return domain.SoundCalibrationProfile{}, fmt.Errorf("failed while reading live sound calibration statistics: %w", err)
+	return profile, identity, nil
+}
+
+type soundStatsAccumulator struct {
+	Count int64
+	mean  float64
+	m2    float64
+}
+
+func (a *soundStatsAccumulator) Add(value float64) {
+	a.Count++
+	delta := value - a.mean
+	a.mean += delta / float64(a.Count)
+	a.m2 += delta * (value - a.mean)
+}
+
+func (a soundStatsAccumulator) Mean() float64 {
+	return a.mean
+}
+
+func (a soundStatsAccumulator) StdDev() float64 {
+	if a.Count <= 1 {
+		return 0
 	}
-	return profile, nil
+	return math.Sqrt(a.m2 / float64(a.Count-1))
 }
 
 func cloneSoundCalibrationProfile(profile domain.SoundCalibrationProfile) domain.SoundCalibrationProfile {
@@ -689,21 +844,22 @@ func (r *nameRepository) SearchCandidateNames(ctx context.Context, targetSatSums
 		semanticSource = "unavailable"
 	}
 	limitClause := ""
+	orderClause := ""
 	args := []interface{}{pq.Array(targetSatSums), pq.Array(targetShaSums), semanticSource}
 	if limit > 0 {
+		orderClause = " ORDER BY name_id ASC"
 		limitClause = " LIMIT $4"
 		args = append(args, limit)
 	}
 	query := fmt.Sprintf(`
-		SELECT name_id, thname, COALESCE(meaning, ''), sat_sum, sha_sum,
+		SELECT name_id, thname, ''::text, sat_sum, sha_sum,
 			COALESCE(pronunciation_ease, 0), COALESCE(euphony_score, 0),
 			COALESCE(rhythm_score, 0), COALESCE(phonetic_version, ''),
-			1.0 AS distance, false AS semantic_available, $3::text AS semantic_source,
+			1.0 AS distance, 1.0 AS similarity_distance, false AS semantic_available, $3::text AS semantic_source,
 			''::text AS semantic_query_model, ''::text AS semantic_vector_hash
 		FROM names_miracle AS n
-		WHERE sat_sum = ANY($1) AND sha_sum = ANY($2) %s
-		ORDER BY name_id ASC%s
-	`, eligibilityClause, limitClause)
+		WHERE sat_sum = ANY($1) AND sha_sum = ANY($2) %s%s%s
+	`, eligibilityClause, orderClause, limitClause)
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to query candidate names: %w", err)
@@ -762,20 +918,28 @@ const unambiguousTitlePrefixGuard = `
 	AND n.thname NOT LIKE 'เด็กหญิง%'
 	AND n.thname NOT LIKE 'เด็กชาย%'`
 
-// Stored sums are not sufficient proof of eligibility when a name contains a
-// character absent from both governed dictionaries. This mirrors dynamic text
-// validation and prevents stale/imported totals from bypassing the rule.
+// Build the governed character set once per query, then delete those characters
+// from each name. An empty remainder proves full dictionary coverage without
+// splitting every row and performing millions of correlated index lookups.
 const mappedCharacterGuard = `
-	AND NOT EXISTS (
-		SELECT 1
-		FROM regexp_split_to_table(n.thname, '') AS chars(char_key)
-		LEFT JOIN sat_nums AS s ON s.char_key = chars.char_key
-		LEFT JOIN sha_nums AS sh ON sh.char_key = chars.char_key
-		WHERE s.char_key IS NULL AND sh.char_key IS NULL
-	)`
+	AND translate(
+		n.thname,
+		(
+			SELECT string_agg(char_key, '' ORDER BY char_key)
+			FROM (
+				SELECT char_key FROM sat_nums
+				UNION
+				SELECT char_key FROM sha_nums
+			) AS mapped_chars
+		),
+		''
+	) = ''`
+
+const lengthGuard = `
+	AND char_length(n.thname) >= 2 AND char_length(n.thname) <= 8`
 
 func candidateEligibilityClause(dayOfBirth string) string {
-	return kalakiniDayClause(dayOfBirth) + canonicalStoredSumGuard + unambiguousTitlePrefixGuard + mappedCharacterGuard
+	return kalakiniDayClause(dayOfBirth) + lengthGuard + canonicalStoredSumGuard + unambiguousTitlePrefixGuard + mappedCharacterGuard
 }
 
 // SearchSemanticWishNames scores every eligible candidate against the requested
@@ -808,6 +972,7 @@ func (r *nameRepository) SearchSemanticWishNames(ctx context.Context, targetSatS
 
 	eligibilityClause := candidateEligibilityClause(dayOfBirth)
 	limitClause := ""
+	orderClause := ""
 	vectorHash := fmt.Sprintf("%x", sha256.Sum256([]byte(vecStr)))
 	args := []interface{}{
 		pq.Array(targetSatSums),
@@ -816,30 +981,30 @@ func (r *nameRepository) SearchSemanticWishNames(ctx context.Context, targetSatS
 		domain.SemanticEmbeddingModel,
 		vectorHash,
 	}
-	snapshotClause := ""
+	semanticAvailableExpr := "meaning_vector IS NOT NULL"
 	if provenance.SnapshotID > 0 {
-		snapshotClause = "AND meaning_vector_snapshot_id = $6"
+		semanticAvailableExpr = "meaning_vector IS NOT NULL AND meaning_vector_snapshot_id = $6"
 		args = append(args, provenance.SnapshotID)
 	}
 	if limit > 0 {
+		orderClause = fmt.Sprintf(" ORDER BY CASE WHEN %s THEN meaning_vector <=> $3::vector ELSE 1.0 END ASC, name_id ASC", semanticAvailableExpr)
 		limitClause = fmt.Sprintf(" LIMIT $%d", len(args)+1)
 		args = append(args, limit)
 	}
 	query := fmt.Sprintf(`
-		SELECT name_id, thname, COALESCE(meaning, ''), sat_sum, sha_sum,
+		SELECT name_id, thname, ''::text, sat_sum, sha_sum,
 			COALESCE(pronunciation_ease, 0), COALESCE(euphony_score, 0),
 			COALESCE(rhythm_score, 0), COALESCE(phonetic_version, ''),
-			COALESCE(meaning_vector <=> $3::vector, 1.0) AS distance,
-			(meaning_vector IS NOT NULL) AS semantic_available,
-			CASE WHEN meaning_vector IS NOT NULL THEN 'embedding' ELSE 'embedding_missing' END AS semantic_source,
+			CASE WHEN %s THEN meaning_vector <=> $3::vector ELSE 1.0 END AS distance,
+			1.0 AS similarity_distance,
+			(%s) AS semantic_available,
+			CASE WHEN %s THEN 'embedding' ELSE 'embedding_missing_or_unapproved_snapshot' END AS semantic_source,
 			$4::text AS semantic_query_model, $5::text AS semantic_vector_hash
 		FROM names_miracle AS n
 		WHERE sat_sum = ANY($1) AND sha_sum = ANY($2)
-			%s
-			AND meaning_vector IS NOT NULL
-			AND vector_dims(meaning_vector) = %d %s
-		ORDER BY meaning_vector <=> $3::vector ASC, name_id ASC%s
-	`, snapshotClause, domain.SemanticVectorDimensions, eligibilityClause, limitClause)
+			AND (meaning_vector IS NULL OR vector_dims(meaning_vector) = %d) %s%s%s
+	`, semanticAvailableExpr, semanticAvailableExpr, semanticAvailableExpr,
+		domain.SemanticVectorDimensions, eligibilityClause, orderClause, limitClause)
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
 		results, fallbackErr := r.SearchCandidateNames(ctx, targetSatSums, targetShaSums, dayOfBirth, cleanWish, limit)
@@ -964,29 +1129,49 @@ func semanticEmbeddingInput(cleanText string) string {
 	return "ความหมาย: " + strings.TrimSpace(cleanText)
 }
 
-// SearchSimilarNames uses PostgreSQL pg_trgm similarity to rank names that are textually similar to the seedName
+// SearchSimilarNames prepares the eligible similarity pool. It compares both
+// raw Thai characters AND
+// phonetically-normalized forms (การันต์ stripped, consonant classes unified)
+// and takes the higher similarity score so that names sounding alike but spelled
+// differently (e.g. กานต์ vs กานดา, ณัฐ vs นัด) also rank well.
 func (r *nameRepository) SearchSimilarNames(ctx context.Context, targetSatSums []int, targetShaSums []int, seedName string, dayOfBirth string, limit int) ([]domain.NameResultItem, error) {
 	if len(targetSatSums) == 0 || len(targetShaSums) == 0 {
 		return []domain.NameResultItem{}, nil
 	}
 	eligibilityClause := candidateEligibilityClause(dayOfBirth)
+	trimmedSeed := strings.TrimSpace(seedName)
+	normalizedSeed := normalizeThaiForSimilarity(trimmedSeed)
 	limitClause := ""
-	args := []interface{}{strings.TrimSpace(seedName), pq.Array(targetSatSums), pq.Array(targetShaSums)}
+	orderClause := ""
+	args := []interface{}{trimmedSeed, pq.Array(targetSatSums), pq.Array(targetShaSums), normalizedSeed}
 	if limit > 0 {
-		limitClause = " LIMIT $4"
+		orderClause = ` ORDER BY GREATEST(
+			similarity(thname, $1),
+			similarity(normalize_thai_phonetic(thname), $4)
+		) DESC, name_id ASC`
+		limitClause = " LIMIT $5"
 		args = append(args, limit)
 	}
+	// GREATEST picks the better of raw-character similarity and phonetic
+	// similarity so that spelling variants don't penalize the score.
 	query := fmt.Sprintf(`
-		SELECT name_id, thname, COALESCE(meaning, ''), sat_sum, sha_sum,
+		SELECT name_id, thname, ''::text, sat_sum, sha_sum,
 			COALESCE(pronunciation_ease, 0), COALESCE(euphony_score, 0),
 			COALESCE(rhythm_score, 0), COALESCE(phonetic_version, ''),
-			(1.0 - similarity(thname, $1)) AS distance,
-			true AS semantic_available, 'trigram' AS semantic_source,
-			'pg_trgm'::text AS semantic_query_model, ''::text AS semantic_vector_hash
+			1.0::double precision AS distance,
+			(1.0 - GREATEST(
+				similarity(thname, $1),
+				similarity(normalize_thai_phonetic(thname), $4)
+			)) AS similarity_distance,
+			false AS semantic_available, 'semantic_unavailable_trigram_only' AS semantic_source,
+			''::text AS semantic_query_model, ''::text AS semantic_vector_hash
 		FROM names_miracle AS n
-		WHERE sat_sum = ANY($2) AND sha_sum = ANY($3) %s
-		ORDER BY similarity(thname, $1) DESC, name_id ASC%s
-	`, eligibilityClause, limitClause)
+		WHERE sat_sum = ANY($2) AND sha_sum = ANY($3)
+			AND (
+				thname %% $1
+				OR normalize_thai_phonetic(thname) %% $4
+			) %s%s%s
+	`, eligibilityClause, orderClause, limitClause)
 
 	rows, err := r.db.QueryContext(ctx, query, args...)
 	if err != nil {
@@ -1010,6 +1195,199 @@ func (r *nameRepository) SearchSimilarNames(ctx context.Context, targetSatSums [
 	return results, nil
 }
 
+// SuggestNames returns raw text/trigram matches without numerology or shadow energy filtering,
+// allowing users to see close names with their actual number pairs (both good and bad).
+func (r *nameRepository) SuggestNames(ctx context.Context, seedName string, limit int) ([]domain.NameResultItem, error) {
+	trimmedSeed := strings.TrimSpace(seedName)
+	if trimmedSeed == "" {
+		return []domain.NameResultItem{}, nil
+	}
+	normalizedSeed := normalizeThaiForSimilarity(trimmedSeed)
+	if limit <= 0 {
+		limit = 8
+	}
+	query := `
+		SELECT name_id, thname, COALESCE(meaning, ''), sat_sum, sha_sum
+		FROM names_miracle
+		WHERE thname NOT LIKE 'เด็กหญิง%'
+			AND thname NOT LIKE 'เด็กหณิง%'
+			AND thname NOT LIKE 'เด็กชาย%'
+			AND thname NOT LIKE 'นางสาว%'
+			AND thname NOT LIKE 'คุณหญิง%'
+			AND (
+			thname = $1
+			OR thname LIKE $1 || '%'
+			OR thname LIKE '%' || $1 || '%'
+			OR similarity(thname, $1) >= 0.20
+			OR similarity(normalize_thai_phonetic(thname), $2) >= 0.20
+		)
+		ORDER BY
+			CASE
+				WHEN thname = $1 THEN 0
+				WHEN thname LIKE $1 || '%' THEN 1
+				WHEN thname LIKE '%' || $1 || '%' THEN 2
+				ELSE 3
+			END,
+			GREATEST(
+				similarity(thname, $1),
+				similarity(normalize_thai_phonetic(thname), $2)
+			) DESC,
+			name_id ASC
+		LIMIT $3
+	`
+	rows, err := r.db.QueryContext(ctx, query, trimmedSeed, normalizedSeed, limit)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []domain.NameResultItem
+	for rows.Next() {
+		var item domain.NameResultItem
+		if err := rows.Scan(&item.NameID, &item.THName, &item.Meaning, &item.SatSum, &item.ShaSum); err != nil {
+			return nil, err
+		}
+		results = append(results, item)
+	}
+	return results, rows.Err()
+}
+
+func (r *nameRepository) GetMeaningVectorByTHName(ctx context.Context, thname string) (string, string, error) {
+	query := `SELECT meaning_vector::text, COALESCE(meaning, '') FROM names_miracle WHERE thname = $1 LIMIT 1`
+	var vectorStr sql.NullString
+	var meaning string
+	err := r.db.QueryRowContext(ctx, query, thname).Scan(&vectorStr, &meaning)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return "", "", nil
+		}
+		return "", "", err
+	}
+	return vectorStr.String, meaning, nil
+}
+
+func (r *nameRepository) SearchSemanticAndSimilarNames(ctx context.Context, targetSatSums []int, targetShaSums []int, seedName string, meaningQuery string, dayOfBirth string, limit int) ([]domain.NameResultItem, error) {
+	if len(targetSatSums) == 0 || len(targetShaSums) == 0 {
+		return []domain.NameResultItem{}, nil
+	}
+
+	provenance, err := r.GetSemanticCorpusProvenance(ctx)
+	if err != nil {
+		return nil, err
+	}
+	if !provenance.Approved {
+		results, fallbackErr := r.SearchSimilarNames(ctx, targetSatSums, targetShaSums, seedName, dayOfBirth, limit)
+		return markSemanticUnavailable(results, provenance.Source), fallbackErr
+	}
+	semanticVector, err := generateOpenAIVector(ctx, strings.TrimSpace(meaningQuery))
+	if err != nil || semanticVector == "" {
+		results, fallbackErr := r.SearchSimilarNames(ctx, targetSatSums, targetShaSums, seedName, dayOfBirth, limit)
+		return markSemanticUnavailable(results, "unavailable_query_embedding_error"), fallbackErr
+	}
+
+	eligibilityClause := candidateEligibilityClause(dayOfBirth)
+	trimmedSeed := strings.TrimSpace(seedName)
+	normalizedSeed := normalizeThaiForSimilarity(trimmedSeed)
+	vectorHash := fmt.Sprintf("%x", sha256.Sum256([]byte(semanticVector)))
+
+	limitClause := ""
+	orderClause := ""
+	args := []interface{}{
+		pq.Array(targetSatSums),
+		pq.Array(targetShaSums),
+		semanticVector,
+		trimmedSeed,
+		normalizedSeed,
+		domain.SemanticEmbeddingModel,
+		vectorHash,
+	}
+	semanticAvailableExpr := "meaning_vector IS NOT NULL"
+	if provenance.SnapshotID > 0 {
+		semanticAvailableExpr = "meaning_vector IS NOT NULL AND meaning_vector_snapshot_id = $8"
+		args = append(args, provenance.SnapshotID)
+	}
+	if limit > 0 {
+		orderClause = fmt.Sprintf(` ORDER BY CASE WHEN %s THEN meaning_vector <=> $3::vector ELSE 1.0 END ASC,
+			GREATEST(similarity(thname, $4), similarity(normalize_thai_phonetic(thname), $5)) DESC,
+			name_id ASC`, semanticAvailableExpr)
+		limitClause = fmt.Sprintf(" LIMIT $%d", len(args)+1)
+		args = append(args, limit)
+	}
+
+	query := fmt.Sprintf(`
+		SELECT name_id, thname, ''::text, sat_sum, sha_sum,
+			COALESCE(pronunciation_ease, 0), COALESCE(euphony_score, 0),
+			COALESCE(rhythm_score, 0), COALESCE(phonetic_version, ''),
+			CASE WHEN %s THEN meaning_vector <=> $3::vector ELSE 1.0 END AS distance,
+			(1.0 - GREATEST(
+				similarity(thname, $4),
+				similarity(normalize_thai_phonetic(thname), $5)
+			)) AS similarity_distance,
+			(%s) AS semantic_available,
+			CASE WHEN %s THEN 'embedding' ELSE 'embedding_missing_or_unapproved_snapshot' END AS semantic_source,
+			$6::text AS semantic_query_model, $7::text AS semantic_vector_hash
+		FROM names_miracle AS n
+		WHERE sat_sum = ANY($1) AND sha_sum = ANY($2)
+			AND (
+				thname %% $4
+				OR normalize_thai_phonetic(thname) %% $5
+			) %s
+			AND (meaning_vector IS NULL OR vector_dims(meaning_vector) = %d)%s%s
+	`, semanticAvailableExpr, semanticAvailableExpr, semanticAvailableExpr,
+		eligibilityClause, domain.SemanticVectorDimensions, orderClause, limitClause)
+
+	rows, err := r.db.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var results []domain.NameResultItem
+	for rows.Next() {
+		var item domain.NameResultItem
+		if err := scanRankingCandidate(rows, &item); err != nil {
+			return nil, err
+		}
+		item.CandidateVectorProvenanceVerified = true
+		item.CandidateVectorProvenanceSource = provenance.Source
+		results = append(results, item)
+	}
+
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return results, nil
+}
+
+// thaiKaranRegex matches a Thai consonant followed by the การันต์ mark (์).
+var thaiKaranRegex = regexp.MustCompile(`[ก-ฮ]์`)
+
+// normalizeThaiForSimilarity produces a phonetically-normalized version of a
+// Thai name by stripping silent markers (การันต์) and unifying consonant
+// classes so that phonetically equivalent names share more trigrams.
+//
+// Examples:
+//
+//	กานต์  → กาน
+//	ณัฐกร  → นัทกร
+//	ศิริษา → สิริสา
+func normalizeThaiForSimilarity(name string) string {
+	// 1. Strip การันต์: remove consonant + ์ pairs.
+	result := thaiKaranRegex.ReplaceAllString(name, "")
+	// 2. Unify consonant classes for phonetic equivalence.
+	result = strings.NewReplacer(
+		"ณ", "น",
+		"ศ", "ส",
+		"ษ", "ส",
+		"ฑ", "ท",
+		"ฐ", "ท",
+		"ภ", "พ",
+		"ธ", "ท",
+	).Replace(result)
+	return result
+}
+
 func scanRankingCandidate(rows *sql.Rows, item *domain.NameResultItem) error {
 	return rows.Scan(
 		&item.NameID,
@@ -1022,6 +1400,7 @@ func scanRankingCandidate(rows *sql.Rows, item *domain.NameResultItem) error {
 		&item.RhythmScore,
 		&item.PhoneticVersion,
 		&item.VectorDistance,
+		&item.SimilarityDistance,
 		&item.SemanticAvailable,
 		&item.SemanticSource,
 		&item.SemanticQueryModel,

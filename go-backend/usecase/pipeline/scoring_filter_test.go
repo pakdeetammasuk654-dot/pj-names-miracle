@@ -53,14 +53,18 @@ func TestSubPrecisionSemanticNoiseFallsThroughToStableNameTieBreaker(t *testing.
 	}
 }
 
-func TestScoringFilterExcludesBadPairEvenWhenSemanticMatchIsPerfect(t *testing.T) {
-	semanticWeight := 1.0
+func TestScoringFilterKeepsKnownBadPairAndSignalsCaution(t *testing.T) {
+	numerologyWeight := 0.50
+	semanticWeight := 0.50
+	soundWeight := 0.0
 	payload := &domain.NameSearchPayload{
 		Request: domain.NameSearchRequest{
-			Mode:           domain.ModeCombined,
-			WishQuery:      "ผู้นำ",
-			SemanticWeight: &semanticWeight,
-			Limit:          10,
+			Mode:             domain.ModeCombined,
+			WishQuery:        "ผู้นำ",
+			NumerologyWeight: &numerologyWeight,
+			SemanticWeight:   &semanticWeight,
+			SoundWeight:      &soundWeight,
+			Limit:            10,
 		},
 		SurnameSatSum: 18,
 		SurnameShaSum: 18,
@@ -84,15 +88,122 @@ func TestScoringFilterExcludesBadPairEvenWhenSemanticMatchIsPerfect(t *testing.T
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(payload.FinalResults) != 1 {
-		t.Fatalf("expected only the all-good candidate, got %d results", len(payload.FinalResults))
+	if len(payload.FinalResults) != 2 {
+		t.Fatalf("expected every governed candidate, got %d results", len(payload.FinalResults))
 	}
-	if payload.FinalResults[0].NameID != 1 {
-		t.Fatalf("expected bad-pair candidate to be excluded, got %q", payload.FinalResults[0].THName)
+	bad := payload.FinalResults[0]
+	if bad.NameID != 2 || !bad.HasBadPair || bad.PairRiskLevel != "caution_r5" {
+		t.Fatalf("known bad pair must remain scoreable with a caution flag, got %+v", bad)
 	}
 	if payload.SemanticQueryModel != "text-embedding-3-small" || payload.SemanticVectorHash != "abc123" ||
 		payload.FinalResults[0].SemanticVectorHash != "abc123" {
 		t.Fatalf("semantic proof provenance was not preserved: model=%q hash=%q item=%q", payload.SemanticQueryModel, payload.SemanticVectorHash, payload.FinalResults[0].SemanticVectorHash)
+	}
+}
+
+func TestScoringFilterAllowsOneR5WhenNumerologyWeightIsLow(t *testing.T) {
+	numerologyWeight := 0.25
+	semanticWeight := 0.75
+	soundWeight := 0.0
+	payload := &domain.NameSearchPayload{
+		Request: domain.NameSearchRequest{
+			Mode: domain.ModeStandalone, WishQuery: "ผู้นำ", Limit: 10,
+			NumerologyWeight: &numerologyWeight, SemanticWeight: &semanticWeight, SoundWeight: &soundWeight,
+		},
+		GoodNumbers: map[string]domain.NumberMeaning{
+			"24": {PairType: "D10", PairPoint: 80},
+			"47": {PairType: "R5", PairPoint: -20},
+		},
+		SemanticCorpus: domain.SemanticCorpusProvenance{Approved: true, Source: "approved_snapshot"},
+		Candidates: []domain.NameResultItem{{
+			NameID: 1, THName: "ความหมายตรง", SatSum: 47, ShaSum: 24,
+			VectorDistance: 0, SemanticAvailable: true, SemanticSource: "embedding",
+		}},
+	}
+	if err := NewScoringFilter().Execute(&domain.PipelineContext[*domain.NameSearchPayload]{Ctx: context.Background(), Data: payload}); err != nil {
+		t.Fatalf("score candidates: %v", err)
+	}
+	if len(payload.FinalResults) != 1 || !payload.FinalResults[0].HasBadPair {
+		t.Fatalf("expected one visible R5 candidate, got %+v", payload.FinalResults)
+	}
+	if payload.FinalResults[0].SatPairType != "R5" || payload.FinalResults[0].PairRiskLevel != "caution_r5" {
+		t.Fatalf("red-pair metadata missing: %+v", payload.FinalResults[0])
+	}
+}
+
+func TestScoringFilterKeepsKnownRiskGradesAtEveryWeight(t *testing.T) {
+	numbers := map[string]domain.NumberMeaning{"24": {PairType: "D10"}, "47": {PairType: "R7", PairPoint: -40}}
+	for _, weight := range []float64{0, 0.20, 1} {
+		decision := evaluateAdaptivePairPolicy([]string{"24", "47"}, numbers, weight)
+		if !decision.Allowed || decision.Level != "caution_r7" {
+			t.Fatalf("R7 must remain a scoreable caution at %.0f%%: %+v", weight*100, decision)
+		}
+	}
+}
+
+func TestZeroNumerologyAllowsGovernedR10AndMultipleBadPairs(t *testing.T) {
+	numbers := map[string]domain.NumberMeaning{
+		"13": {PairType: "R5"}, "31": {PairType: "R5"}, "67": {PairType: "R10"},
+	}
+	if !evaluateAdaptivePairPolicy([]string{"67"}, numbers, 0).Allowed {
+		t.Fatal("R10 must remain visible when numerology is not applied")
+	}
+	decision := evaluateAdaptivePairPolicy([]string{"13", "31"}, numbers, 1)
+	if !decision.Allowed || decision.BadCount != 2 {
+		t.Fatalf("all governed pairs must remain scoreable at every weight, got %+v", decision)
+	}
+}
+
+func TestAdaptivePairScopeMatchesSliderThresholds(t *testing.T) {
+	weight := func(value float64) *float64 { return &value }
+	tests := []struct {
+		numerology float64
+		want       string
+	}{
+		{numerology: 0.35, want: "all_known_pairs_scored"},
+		{numerology: 0.20, want: "all_known_pairs_scored"},
+		{numerology: 0, want: "all_known_pairs_scored"},
+	}
+	for _, tt := range tests {
+		request := domain.NameSearchRequest{
+			NumerologyWeight: weight(tt.numerology),
+			SemanticWeight:   weight(1 - tt.numerology),
+			SoundWeight:      weight(0),
+		}
+		if got := AdaptivePairScope(request); got != tt.want {
+			t.Fatalf("numerology %.0f%%: want %q, got %q", tt.numerology*100, tt.want, got)
+		}
+	}
+}
+
+func TestZeroNumerologyTopResultsUsesNaturalScoreOrderWithoutPairQuota(t *testing.T) {
+	items := []domain.NameResultItem{
+		{NameID: 1, FinalScore: 100, HasBadPair: true},
+		{NameID: 2, FinalScore: 99, HasBadPair: true},
+		{NameID: 3, FinalScore: 98},
+	}
+	selected := selectAdaptiveTopResults(items, 2, 0)
+	if len(selected) != 2 || selected[0].NameID != 1 || selected[1].NameID != 2 {
+		t.Fatalf("0%% numerology must preserve natural non-numerology order, got %+v", selected)
+	}
+}
+
+func TestTopResultsNeverReservesCautionRows(t *testing.T) {
+	items := make([]domain.NameResultItem, 0, 120)
+	for i := 0; i < 115; i++ {
+		items = append(items, domain.NameResultItem{NameID: i + 1, FinalScore: float64(200 - i)})
+	}
+	for i := 0; i < 5; i++ {
+		items = append(items, domain.NameResultItem{NameID: 200 + i, FinalScore: float64(80 - i), HasBadPair: true})
+	}
+	selected := selectAdaptiveTopResults(items, 100, 0.25)
+	for i, item := range selected {
+		if i > 0 && selected[i-1].FinalScore < item.FinalScore {
+			t.Fatalf("selected result order changed at %d: %.2f before %.2f", i, selected[i-1].FinalScore, item.FinalScore)
+		}
+	}
+	if selected[len(selected)-1].NameID != 100 {
+		t.Fatalf("top 100 must be the highest score rows without a caution quota, got last=%+v", selected[len(selected)-1])
 	}
 }
 
@@ -138,20 +249,79 @@ func TestThreeDimensionWeightsAreNormalized(t *testing.T) {
 	numerologyWeight := 0.45
 	semanticWeight := 0.35
 	soundWeight := 0.20
-	num, sem, sound := resolveRankingWeights(domain.NameSearchRequest{
+	num, sem, snd, sim := resolveRankingWeights(domain.NameSearchRequest{
 		NumerologyWeight: &numerologyWeight,
 		SemanticWeight:   &semanticWeight,
 		SoundWeight:      &soundWeight,
 	})
 
-	if num != 0.45 || sem != 0.35 || sound != 0.20 {
-		t.Fatalf("expected 45/35/20 normalization, got %.2f/%.2f/%.2f", num, sem, sound)
+	if num != 0.45 || sem != 0.35 || snd != 0.20 || sim != 0 {
+		t.Errorf("default weights mismatch: got %.2f/%.2f/%.2f/%.2f", num, sem, snd, sim)
+	}
+}
+
+func TestFourDimensionWeightsAndSimilarityRanking(t *testing.T) {
+	zero := 0.0
+	one := 1.0
+	payload := &domain.NameSearchPayload{
+		Request: domain.NameSearchRequest{
+			Mode: domain.ModeStandalone, PrototypeName: "ณเดชน์", IsNameIntent: true,
+			NumerologyWeight: &zero, SemanticWeight: &zero, SoundWeight: &zero, SimilarityWeight: &one,
+		},
+		GoodNumbers: map[string]domain.NumberMeaning{
+			"24": {PairType: "D10", PairPoint: 80},
+		},
+		Candidates: []domain.NameResultItem{
+			{NameID: 3, THName: "ณเดชน์", SatSum: 24, ShaSum: 24, SimilarityDistance: 0},
+			{NameID: 1, THName: "ชื่อคล้ายน้อย", SatSum: 24, ShaSum: 24, SimilarityDistance: 0.80},
+			{NameID: 2, THName: "ชื่อคล้ายมาก", SatSum: 24, ShaSum: 24, SimilarityDistance: 0.10},
+		},
+	}
+
+	if err := NewScoringFilter().Execute(&domain.PipelineContext[*domain.NameSearchPayload]{Ctx: context.Background(), Data: payload}); err != nil {
+		t.Fatalf("score candidates: %v", err)
+	}
+	if len(payload.FinalResults) != 3 || payload.FinalResults[0].NameID != 3 {
+		t.Fatalf("expected exact pg_trgm match to rank first, got %+v", payload.FinalResults)
+	}
+	if payload.FinalResults[0].SimilarityScore != 100 || payload.AppliedWeights.Similarity != 1 {
+		t.Fatalf("unexpected similarity score/weight: item=%+v weights=%+v", payload.FinalResults[0], payload.AppliedWeights)
+	}
+}
+
+func TestSurnameCandidateUsesSurnameSoundAndKalakiniScope(t *testing.T) {
+	payload := &domain.NameSearchPayload{
+		Request: domain.NameSearchRequest{
+			Mode:         domain.ModeCombined,
+			SearchTarget: domain.TargetSurname,
+			DayOfBirth:   "sunday",
+		},
+		GoodNumbers: map[string]domain.NumberMeaning{
+			"24": {PairType: "D10", PairPoint: 80},
+		},
+		Candidates: []domain.NameResultItem{{
+			NameID: 1, THName: "นามสกุลใหม่", SatSum: 24, ShaSum: 24,
+		}},
+	}
+
+	if err := NewScoringFilter().Execute(&domain.PipelineContext[*domain.NameSearchPayload]{Ctx: context.Background(), Data: payload}); err != nil {
+		t.Fatalf("score surname candidate: %v", err)
+	}
+	if len(payload.FinalResults) != 1 {
+		t.Fatalf("expected one surname result, got %+v", payload.FinalResults)
+	}
+	item := payload.FinalResults[0]
+	if item.SoundScope != "surname" {
+		t.Fatalf("expected surname sound scope, got %q", item.SoundScope)
+	}
+	if !strings.Contains(strings.Join(item.RankingReasons, " "), "นามสกุลผ่านการกรองกาลกิณี") {
+		t.Fatalf("expected candidate-role Kalakini reason, got %+v", item.RankingReasons)
 	}
 }
 
 func TestCalculateSoundScoreUsesTransparentComponentWeights(t *testing.T) {
 	got := calculateSoundScore(80, 90, 70, "กิตติ") // Length 5 -> 0 penalty
-	const want = 81.5 // (80*45%) + (90*35%) + (70*20%)
+	const want = 81.5                               // (80*45%) + (90*35%) + (70*20%)
 	if got != want {
 		t.Fatalf("expected sound score %.1f, got %.1f", want, got)
 	}
@@ -246,8 +416,8 @@ func TestEligibleBaseSumsUsesPostSurnameTotalsAcrossFullRange(t *testing.T) {
 	if !got[19] { // 19 + 23 = 42 (D10)
 		t.Fatal("expected base sum 19 to be eligible after surname sum 23")
 	}
-	if got[24] { // 24 + 23 = 47 (R5)
-		t.Fatal("expected base sum 24 to be excluded after surname sum 23")
+	if !got[24] { // Cached superset keeps every governed grade for 0% reranking.
+		t.Fatal("expected base sum 24 to remain in complete candidate pool")
 	}
 	if !got[119] { // 119 + 23 = 142 -> 14, 42 (both D)
 		t.Fatal("expected multi-digit total 142 to be eligible")
@@ -293,15 +463,86 @@ func TestEligibleStandaloneSumsIncludeValuesAboveNinetyNine(t *testing.T) {
 	t.Fatal("expected standalone sum 119 (pairs 11 and 19) in the complete eligible range")
 }
 
-func TestCombinedModeRejectsBadStandalonePairEvenWhenCombinedPairIsGood(t *testing.T) {
+func TestCombinedPoolIncludesGovernedBadCandidateForZeroNumerology(t *testing.T) {
 	numbers := map[string]domain.NumberMeaning{
 		"01": {PairType: "R5", PairPoint: -10},
 		"24": {PairType: "D10", PairPoint: 80},
 	}
 
 	eligible := eligibleBaseSums(23, 1, numbers, true)
-	if len(eligible) != 0 {
-		t.Fatalf("expected base sum 1 to be rejected before its good combined total 24, got %v", eligible)
+	if len(eligible) != 1 || eligible[0] != 1 {
+		t.Fatalf("expected governed bad candidate in complete rerank pool, got %v", eligible)
+	}
+}
+
+func TestCombinedBadCandidateIsScoreableAtEveryNumerologyWeight(t *testing.T) {
+	zero, one := 0.0, 1.0
+	newPayload := func(numerology, sound *float64) *domain.NameSearchPayload {
+		return &domain.NameSearchPayload{
+			Request: domain.NameSearchRequest{
+				Mode: domain.ModeCombined, NumerologyWeight: numerology,
+				SemanticWeight: &zero, SoundWeight: sound, SimilarityWeight: &zero,
+			},
+			SurnameSatSum: 23,
+			SurnameShaSum: 23,
+			GoodNumbers: map[string]domain.NumberMeaning{
+				"01": {PairType: "R5", PairPoint: -10},
+				"24": {PairType: "D10", PairPoint: 80},
+			},
+			Candidates: []domain.NameResultItem{{NameID: 1, THName: "ทดสอบ", SatSum: 1, ShaSum: 1}},
+		}
+	}
+
+	zeroPayload := newPayload(&zero, &one)
+	if err := NewScoringFilter().Execute(&domain.PipelineContext[*domain.NameSearchPayload]{Ctx: context.Background(), Data: zeroPayload}); err != nil {
+		t.Fatalf("score 0%% numerology: %v", err)
+	}
+	if len(zeroPayload.FinalResults) != 1 || zeroPayload.FinalResults[0].BadPairCount != 0 {
+		// The displayed combined pair is 24 (D10); base pair 01 is intentionally
+		// not used as a hidden rejection when numerology is disabled.
+		t.Fatalf("expected candidate at 0%% numerology, got %+v", zeroPayload.FinalResults)
+	}
+
+	positivePayload := newPayload(&one, &zero)
+	if err := NewScoringFilter().Execute(&domain.PipelineContext[*domain.NameSearchPayload]{Ctx: context.Background(), Data: positivePayload}); err != nil {
+		t.Fatalf("score positive numerology: %v", err)
+	}
+	if len(positivePayload.FinalResults) != 1 {
+		t.Fatalf("expected governed candidate to remain scoreable above 0%%, got %+v", positivePayload.FinalResults)
+	}
+}
+
+func TestCombinedAdaptiveWarningAlwaysMapsToDisplayedBadPair(t *testing.T) {
+	numerologyWeight, semanticWeight, soundWeight := 0.25, 0.75, 0.0
+	payload := &domain.NameSearchPayload{
+		Request: domain.NameSearchRequest{
+			Mode: domain.ModeCombined, Limit: 10,
+			NumerologyWeight: &numerologyWeight, SemanticWeight: &semanticWeight, SoundWeight: &soundWeight,
+		},
+		SurnameSatSum: 23,
+		SurnameShaSum: 23,
+		GoodNumbers: map[string]domain.NumberMeaning{
+			"24": {PairType: "D10", PairPoint: 80},
+			"47": {PairType: "R5", PairPoint: -20},
+		},
+		Candidates: []domain.NameResultItem{{NameID: 1, THName: "ทดสอบ", SatSum: 24, ShaSum: 24}},
+	}
+	if err := NewScoringFilter().Execute(&domain.PipelineContext[*domain.NameSearchPayload]{Ctx: context.Background(), Data: payload}); err != nil {
+		t.Fatalf("score combined candidate: %v", err)
+	}
+	if len(payload.FinalResults) != 1 || payload.FinalResults[0].BadPairCount != 2 {
+		t.Fatalf("two displayed red pairs must remain scoreable and flagged, got %+v", payload.FinalResults)
+	}
+
+	// Only one post-surname dimension becomes red; the warning must therefore
+	// correspond exactly to the red pair included in the response display.
+	payload.Candidates = []domain.NameResultItem{{NameID: 2, THName: "แสดงแดง", SatSum: 24, ShaSum: 1}}
+	payload.GoodNumbers["01"] = domain.NumberMeaning{PairType: "D8", PairPoint: 50}
+	if err := NewScoringFilter().Execute(&domain.PipelineContext[*domain.NameSearchPayload]{Ctx: context.Background(), Data: payload}); err != nil {
+		t.Fatalf("score visible caution candidate: %v", err)
+	}
+	if len(payload.FinalResults) != 1 || !payload.FinalResults[0].HasBadPair || payload.FinalResults[0].SatPairType != "R5" {
+		t.Fatalf("expected warning backed by displayed R5 pair, got %+v", payload.FinalResults)
 	}
 }
 

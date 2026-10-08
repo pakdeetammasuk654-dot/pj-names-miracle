@@ -1,0 +1,2 @@
+-- This migration adopts an existing editorial archive in production.
+-- Deliberately no-op on rollback: deleting owner-authored articles is unsafe.

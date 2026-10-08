@@ -17,7 +17,11 @@ func NewKalakiniFilter() *KalakiniFilter {
 func (f *KalakiniFilter) Execute(pCtx *domain.PipelineContext[*domain.NameSearchPayload]) error {
 	day := strings.ToLower(strings.TrimSpace(pCtx.Data.Request.DayOfBirth))
 	if day != "" {
-		log.Printf("[Pipeline Step 2: KalakiniFilter] Applied first-name Kalakini filter for Day: %s", day)
+		scope := "first_name"
+		if pCtx.Data.Request.Mode == domain.ModeCombined && pCtx.Data.Request.SearchTarget == domain.TargetSurname {
+			scope = "surname"
+		}
+		log.Printf("[Pipeline Step 2: KalakiniFilter] Applied candidate %s Kalakini filter for Day: %s", scope, day)
 	} else {
 		log.Printf("[Pipeline Step 2: KalakiniFilter] DayOfBirth not specified, skipping Kalakini filter")
 	}

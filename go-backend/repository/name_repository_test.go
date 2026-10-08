@@ -172,8 +172,11 @@ func TestCandidateEligibilityClauseAppliesDayCanonicalAeAndChildTitleGuards(t *t
 		"LEFT JOIN sha_nums",
 		"n.thname NOT LIKE 'เด็กหญิง%'",
 		"n.thname NOT LIKE 'เด็กชาย%'",
-		"AND NOT EXISTS",
-		"WHERE s.char_key IS NULL AND sh.char_key IS NULL",
+		"AND translate(",
+		"SELECT char_key FROM sat_nums",
+		"UNION",
+		"SELECT char_key FROM sha_nums",
+		") = ''",
 	} {
 		if !strings.Contains(clause, required) {
 			t.Fatalf("candidate safety clause is missing %q: %s", required, clause)

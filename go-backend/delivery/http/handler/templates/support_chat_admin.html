@@ -1,0 +1,189 @@
+{{define "support_chat_admin.html"}}<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>แชตลูกค้า — อ.ทญา ว่องไว | ชื่อดี</title>
+<link rel="stylesheet" href="/static/styles.css?v=11">
+<style>
+.message::before,.message::after{content:none!important;display:none!important}
+.chat{max-width:1180px;padding-top:24px}.chat h1{color:var(--gold-light)}.inbox-head{align-items:center;display:flex;flex-wrap:wrap;gap:12px;justify-content:space-between}.notice-button{background:transparent;border:1px solid var(--border-gold);color:var(--gold-light);cursor:pointer;font:inherit;padding:7px 10px}.tabs{display:flex;gap:8px;flex-wrap:wrap;margin:16px 0}.tabs a{padding:9px 12px;border:1px solid var(--border-gold);color:var(--text-muted);text-decoration:none}.tabs a.active{background:var(--gold-primary);color:#140B07;font-weight:800}.count{display:inline-flex;align-items:center;justify-content:center;min-width:22px;margin-left:5px;padding:1px 6px;border-radius:99px;background:rgba(255,255,255,.18);font-size:.8rem}.tabs a.active .count{background:rgba(20,11,7,.2)}.layout{display:grid;grid-template-columns:340px 1fr;min-height:620px;border:1px solid var(--border-gold);background:var(--bg-card)}.threads{border-right:1px solid var(--border-gold)}.thread{display:flex;align-items:center;gap:10px;padding:14px 15px;color:inherit;text-decoration:none;border-bottom:1px solid rgba(212,175,55,.2)}.thread:hover,.thread.active{background:#382014}.thread-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:1px solid var(--border-gold);flex-shrink:0}.thread-info{flex:1;min-width:0}.thread-info strong,.thread-info span{display:block}.thread-info span{color:var(--text-muted);font-size:.84rem;margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.badge{display:inline-block;margin-left:6px;padding:1px 6px;border-radius:10px;background:#d4af37;color:#140B07;font-size:.75rem}.empty{padding:30px;color:var(--text-muted)}.room{display:flex;flex-direction:column;height:680px}.room-head{padding:16px;border-bottom:1px solid var(--border-gold);display:flex;align-items:center;justify-content:space-between;gap:12px}.room-title{display:flex;align-items:center;gap:10px}.room-avatar{width:38px;height:38px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border-gold)}.room-head form{margin:0}.close{border:1px solid var(--border-gold);background:transparent;color:var(--gold-light);padding:5px 9px;cursor:pointer}.messages{flex:1;padding:18px;overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;gap:12px;scroll-behavior:smooth}.msg-row{display:flex;align-items:flex-start;gap:8px;max-width:82%}.msg-row.customer{align-self:flex-start}.msg-row.admin{align-self:flex-end;flex-direction:row-reverse}.msg-avatar{width:36px;height:36px;border-radius:50%;object-fit:cover;border:1.5px solid var(--border-gold);flex-shrink:0;background:#26160E}.message{padding:10px 14px;border-radius:12px;background:#26160E;color:#fff;margin-left:0!important;margin-right:0!important;word-break:break-word}.message.admin{background:#4A2B19}.message small{display:block;color:var(--text-muted);margin-bottom:4px}.message p{margin:0;white-space:pre-wrap}.message img{display:block;max-width:100%;max-height:330px;margin-top:8px;border-radius:8px}.composer{padding:15px;border-top:1px solid var(--border-gold);display:grid;gap:9px}.composer textarea{min-height:70px;padding:9px;background:#1F120B;color:#fff;border:1px solid var(--border-gold);font:inherit;border-radius:6px;resize:vertical}.composer-actions{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.composer button{margin-left:auto;padding:9px 22px;border:0;border-radius:6px;background:var(--gold-primary);color:#140B07;font-weight:800;cursor:pointer;font-size:.95rem;transition:opacity .2s}.composer button:disabled{opacity:.6;cursor:not-allowed}.toast{bottom:22px;display:none;position:fixed;right:22px;z-index:200;background:#f3e5ab;color:#140B07;padding:13px 16px;border-radius:10px;box-shadow:0 14px 36px rgba(0,0,0,.35);font-weight:800}.toast.show{display:block}@media(max-width:720px){.layout{grid-template-columns:1fr}.threads{border-right:0;border-bottom:1px solid var(--border-gold)}.room{min-height:500px}}
+.img-modal{display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.92);z-index:9999;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}.img-modal.show{display:flex}.img-modal-content{position:relative;max-width:92vw;max-height:92vh;display:flex;flex-direction:column;align-items:center}.img-modal-content img{max-width:100%;max-height:82vh;object-fit:contain;border-radius:8px;box-shadow:0 8px 30px rgba(0,0,0,.8)}.img-modal-close{position:absolute;top:-40px;right:-4px;background:rgba(255,255,255,.25);border:0;color:#fff;font-size:1.3rem;width:36px;height:36px;border-radius:50%;cursor:pointer;display:flex;align-items:center;justify-content:center}.img-modal-content a{color:var(--gold-light);margin-top:10px;text-decoration:underline;font-size:.95rem}.message img{cursor:zoom-in}.delete-message{display:block;margin:8px 0 0 auto;padding:2px 0;border:0;background:transparent;color:#e9baa9;font:inherit;font-size:.78rem;cursor:pointer}.delete-message:hover{text-decoration:underline}</style>
+</head>
+<body>
+<main class="page-content chat">
+<div class="inbox-head">
+<div>
+<h1>แชตลูกค้า — อ.ทญา ว่องไว</h1>
+<p>เคสใหม่จะอัปเดตอัตโนมัติทุก 5 วินาที</p>
+</div>
+<button class="notice-button" id="notice-button" type="button">🔔 เปิดแจ้งเตือนในเบราว์เซอร์</button>
+</div>
+<nav class="tabs">
+<a class="{{if eq .Inbox "needs_reply"}}active{{end}}" href="/admin/chat?view=needs_reply">รอตอบ <b class="count" id="needs-reply-count">{{.Stats.NeedsReply}}</b>
+</a>
+<a class="{{if eq .Inbox "active"}}active{{end}}" href="/admin/chat?view=active">กำลังคุย <b class="count" id="active-count">{{.Stats.Active}}</b>
+</a>
+<a class="{{if eq .Inbox "closed"}}active{{end}}" href="/admin/chat?view=closed">ปิดแล้ว <b class="count" id="closed-count">{{.Stats.Closed}}</b>
+</a>
+</nav>
+<section class="layout">
+<aside class="threads">{{if .Conversations}}{{range .Conversations}}<a class="thread {{if and $.Active (eq $.Active.ID .ID)}}active{{end}}" href="/admin/chat/{{.ID}}?view={{$.Inbox}}">
+<img class="thread-avatar" src="{{customerAvatarURL .CustomerAvatar}}" alt="avatar">
+<div class="thread-info">
+<strong>{{if .CustomerName}}{{.CustomerName}}{{else}}ลูกค้า{{end}}{{if .AdminUnreadCount}}<b class="badge">รอตอบ {{.AdminUnreadCount}}</b>{{end}}</strong>
+<span>{{.LastMessagePreview}}</span>
+<span>{{.UpdatedAt.Format "02 Jan 15:04"}}</span>
+</div>
+</a>{{end}} {{else}}<p class="empty">ไม่มีบทสนทนาในหมวดนี้</p>{{end}}</aside>
+<section class="room">{{if .Active}}<header class="room-head">
+<div class="room-title">
+<img class="room-avatar" src="{{customerAvatarURL .Active.CustomerAvatar}}" alt="avatar">
+<strong>{{if .Active.CustomerName}}{{.Active.CustomerName}}{{else}}ลูกค้า{{end}}</strong>
+</div>{{if eq .Active.Status "open"}}<form method="post" action="/admin/chat/{{.Active.ID}}/close">
+<button class="close">ปิดเคส</button>
+</form>{{end}}</header>
+<div class="messages" id="messages-box">{{range .Messages}}<div class="msg-row {{.Sender}}">
+<img class="msg-avatar" src="{{if eq .Sender "admin"}}/images/taya_avatar.jpg?v=5{{else}}{{customerAvatarURL $.Active.CustomerAvatar}}{{end}}" alt="{{if eq .Sender "admin"}}อ.ทญา{{else}}ลูกค้า{{end}}">
+<article class="message {{.Sender}}">
+<small>{{if eq .Sender "admin"}}อ.ทญา ว่องไว{{else}}ลูกค้า{{end}} · {{.CreatedAt.Format "02 Jan 15:04"}}{{if and (eq .Sender "admin") .IsRead}} · <span style="color:rgba(255,255,255,0.55);font-size:0.75rem;font-weight:400">อ่านแล้ว</span>{{end}}</small>{{if .Body}}<p>{{.Body}}</p>{{end}}{{if .ImageURL}}<a href="{{.ImageURL}}" target="_blank" rel="noopener" onclick="openImgModal(event,'{{.ImageURL}}')">
+<img src="{{.ImageURL}}" alt="รูปที่แนบในแชต" onload="scrollToBottom(false)">
+</a>{{end}}</article><button class="delete-message" type="button" data-message-id="{{.ID}}">ลบข้อความ</button>
+</div>{{end}}</div>
+<form class="composer" id="composer-form" method="post" action="/admin/chat/{{.Active.ID}}/messages" enctype="multipart/form-data">
+<textarea name="body" id="composer-body" maxlength="4000" placeholder="พิมพ์ข้อความตอบลูกค้าในนาม อ.ทญา (กด Enter เพื่อส่ง, Shift+Enter เพื่อขึ้นบรรทัดใหม่)">
+</textarea>
+<div class="composer-actions">
+<input type="file" name="image" id="composer-file" accept="image/jpeg,image/png,image/webp">
+<button type="submit" id="composer-submit">ส่งข้อความ</button>
+</div>
+</form>{{else}}<p class="empty">เลือกบทสนทนาทางซ้ายเพื่อเริ่มตอบลูกค้า</p>{{end}}</section>
+</section>
+</main>
+<div id="toast" class="toast">มีข้อความใหม่รอตอบ</div>
+<div id="img-modal" class="img-modal" onclick="closeImgModal(event)">
+<div class="img-modal-content" onclick="event.stopPropagation()">
+<button class="img-modal-close" type="button" onclick="closeImgModal(null)">✕</button>
+<img id="img-modal-src" src="" alt="รูปภาพขยาย">
+<a id="img-modal-link" href="" target="_blank" rel="noopener">เปิดรูปต้นฉบับในแท็บใหม่ ↗</a>
+</div>
+</div>
+<script>
+function openImgModal(e,url){if(e)e.preventDefault();const m=document.querySelector('#img-modal'),s=document.querySelector('#img-modal-src'),l=document.querySelector('#img-modal-link');s.src=url;l.href=url;m.classList.add('show')}
+function closeImgModal(e){if(!e||e.target===document.querySelector('#img-modal')||e.target.classList.contains('img-modal-close')){document.querySelector('#img-modal').classList.remove('show')}}
+function playChime(){try{const ctx=new(window.AudioContext||window.webkitAudioContext)();const now=ctx.currentTime,osc1=ctx.createOscillator(),osc2=ctx.createOscillator(),gain=ctx.createGain();osc1.type='sine';osc1.frequency.setValueAtTime(587.33,now);osc2.type='triangle';osc2.frequency.setValueAtTime(880,now+0.1);gain.gain.setValueAtTime(0.18,now);gain.gain.exponentialRampToValueAtTime(0.001,now+0.65);osc1.connect(gain);osc2.connect(gain);gain.connect(ctx.destination);osc1.start(now);osc1.stop(now+0.3);osc2.start(now+0.1);osc2.stop(now+0.65)}catch(_){}}
+const counters={needs_reply:document.querySelector('#needs-reply-count'),active:document.querySelector('#active-count'),closed:document.querySelector('#closed-count')};let previous={{.Stats.NeedsReply}};const toast=document.querySelector('#toast');function showNotice(count){playChime();toast.textContent='มี '+count+' เคสรอตอบ';toast.classList.add('show');setTimeout(()=>toast.classList.remove('show'),6000);document.title='('+count+') แชตลูกค้า | ชื่อดี';if(document.visibilityState==='hidden'&&'Notification'in window&&Notification.permission==='granted')new Notification('ชื่อดี: มีข้อความใหม่',{body:'มี '+count+' เคสรอตอบ'})}async function refreshSummary(){try{const r=await fetch('/admin/chat/summary',{cache:'no-store'});if(!r.ok)return;const s=await r.json();Object.entries(counters).forEach(([key,node])=>node.textContent=s[key]);if(s.needs_reply>previous)showNotice(s.needs_reply);previous=s.needs_reply;if(!s.needs_reply)document.title='แชตลูกค้า | ชื่อดี'}catch(_){}}document.querySelector('#notice-button').onclick=async()=>{if(!('Notification'in window)){alert('เบราว์เซอร์นี้ไม่รองรับการแจ้งเตือน');return}const permission=await Notification.requestPermission();document.querySelector('#notice-button').textContent=permission==='granted'?'🔔 เปิดการแจ้งเตือนแล้ว':'🔔 ไม่ได้รับอนุญาต'};setInterval(refreshSummary,5000);refreshSummary();
+
+const activeId={{if .Active}}"{{.Active.ID}}"{{else}}""{{end}};
+const messagesContainer=document.querySelector('#messages-box')||document.querySelector('.messages');
+
+function scrollToBottom(smooth = false) {
+    if (!messagesContainer) return;
+    requestAnimationFrame(() => {
+        if (smooth) {
+            messagesContainer.scrollTo({ top: messagesContainer.scrollHeight, behavior: 'smooth' });
+        } else {
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        }
+    });
+}
+
+// Ensure scroll down on load and after assets render
+scrollToBottom(false);
+window.addEventListener('load', () => scrollToBottom(false));
+setTimeout(() => scrollToBottom(false), 150);
+setTimeout(() => scrollToBottom(false), 500);
+
+const avatarMap={cat:'/images/chat_avatar_cat.png',dog:'/images/chat_avatar_dog.png',rabbit:'/images/chat_avatar_rabbit.png',bear:'/images/chat_avatar_bear.png',panda:'/images/chat_avatar_panda.png'};
+function customerAvatarURL(k){return avatarMap[k]||avatarMap.cat}
+function esc(v){const n=document.createElement('div');n.textContent=v;return n.innerHTML}
+function formatTime(iso){if(!iso)return'';const d=new Date(iso),m=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],day=String(d.getDate()).padStart(2,'0'),h=String(d.getHours()).padStart(2,'0'),min=String(d.getMinutes()).padStart(2,'0');return day+' '+m[d.getMonth()]+' '+h+':'+min}
+
+async function refreshActiveMessages(forceScroll = false){
+    if(!activeId||!messagesContainer)return;
+    try{
+        const r=await fetch('/admin/chat/'+activeId+'/messages',{cache:'no-store'});
+        if(!r.ok)return;
+        const data=await r.json(),items=data.messages||[];
+        const isNear=messagesContainer.scrollHeight-messagesContainer.scrollTop-messagesContainer.clientHeight<150;
+        messagesContainer.innerHTML=items.map(m=>{
+            const isAdm=m.sender==='admin',av=isAdm?'/images/taya_avatar.jpg?v=5':customerAvatarURL(data.customer_avatar),lbl=isAdm?'อ.ทญา ว่องไว':'ลูกค้า',read=isAdm&&m.is_read?' · <span style="color:rgba(255,255,255,0.55);font-size:0.75rem;font-weight:400">อ่านแล้ว</span>':'',body=m.body?'<p>'+esc(m.body)+'</p>':'',img=m.image_url?'<a href="'+m.image_url+'" target="_blank" rel="noopener" onclick="openImgModal(event,\''+m.image_url+'\')"><img src="'+m.image_url+'" alt="รูปที่แนบในแชต" onload="scrollToBottom(false)"></a>':'';
+            return'<div class="msg-row '+m.sender+'"><img class="msg-avatar" src="'+av+'" alt="'+lbl+'"><article class="message '+m.sender+'"><small>'+lbl+' · '+formatTime(m.created_at)+read+'</small>'+body+img+'</article><button class="delete-message" type="button" data-message-id="'+esc(m.id)+'">ลบข้อความ</button></div>';
+        }).join('');
+        if(forceScroll || isNear){
+            scrollToBottom(forceScroll);
+        }
+    }catch(_){}
+}
+
+if(activeId){
+    setInterval(() => refreshActiveMessages(false), 3000);
+}
+
+messagesContainer?.addEventListener('click', async (event) => {
+    const button = event.target.closest('.delete-message');
+    if (!button || !activeId) return;
+    if (!confirm('ลบข้อความนี้จากบทสนทนาทั้งสองฝ่าย? การลบไม่สามารถย้อนกลับได้')) return;
+    button.disabled = true;
+    try {
+        const response = await fetch('/admin/chat/' + activeId + '/messages/' + encodeURIComponent(button.dataset.messageId) + '/delete?view=active', { method: 'POST' });
+        if (!response.ok) throw new Error('delete failed');
+        await refreshActiveMessages(false);
+    } catch (_) {
+        alert('ไม่สามารถลบข้อความได้ กรุณาลองใหม่');
+        button.disabled = false;
+    }
+});
+
+// Enhanced Composer AJAX submission with instant scroll to bottom
+const composerForm = document.querySelector('#composer-form');
+const composerBody = document.querySelector('#composer-body');
+const composerFile = document.querySelector('#composer-file');
+const composerSubmit = document.querySelector('#composer-submit');
+
+if (composerForm && composerBody && composerSubmit) {
+    // Quick send with Enter (Shift+Enter for newline)
+    composerBody.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            composerForm.requestSubmit();
+        }
+    });
+
+    composerForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const textVal = composerBody.value.trim();
+        const hasFile = composerFile.files && composerFile.files.length > 0;
+
+        if (!textVal && !hasFile) return;
+
+        composerSubmit.disabled = true;
+        composerSubmit.textContent = 'กำลังส่ง...';
+
+        const formData = new FormData(composerForm);
+
+        try {
+            const resp = await fetch(composerForm.action, {
+                method: 'POST',
+                body: formData
+            });
+            if (resp.ok || resp.redirected) {
+                composerBody.value = '';
+                composerFile.value = '';
+                await refreshActiveMessages(true);
+                setTimeout(() => scrollToBottom(true), 100);
+            } else {
+                composerForm.submit(); // fallback
+            }
+        } catch (_) {
+            composerForm.submit(); // fallback
+        } finally {
+            composerSubmit.disabled = false;
+            composerSubmit.textContent = 'ส่งข้อความ';
+            composerBody.focus();
+        }
+    });
+}
+</script>
+</body>
+</html>{{end}}

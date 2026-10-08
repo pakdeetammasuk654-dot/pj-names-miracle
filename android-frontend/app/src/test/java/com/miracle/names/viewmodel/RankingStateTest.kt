@@ -10,12 +10,13 @@ class RankingStateTest {
 
     @Test
     fun normalizeRankingWeights_producesOneHundredPercent() {
-        val weights = normalizeRankingWeights(0.15f, 0.15f, 0.70f)
+        val weights = normalizeRankingWeights(0.15f, 0.15f, 0.50f, 0.20f)
 
         assertEquals(0.15f, weights.numerology, 0.0001f)
         assertEquals(0.15f, weights.semantic, 0.0001f)
-        assertEquals(0.70f, weights.sound, 0.0001f)
-        assertEquals(1f, weights.numerology + weights.semantic + weights.sound, 0.0001f)
+        assertEquals(0.50f, weights.sound, 0.0001f)
+        assertEquals(0.20f, weights.similarity, 0.0001f)
+        assertEquals(1f, weights.numerology + weights.semantic + weights.sound + weights.similarity, 0.0001f)
     }
 
     @Test
@@ -26,25 +27,37 @@ class RankingStateTest {
 
     @Test
     fun responseWeights_useBackendAppliedFormulaWhenPresent() {
-        val selected = RankingWeights(0.15f, 0.15f, 0.70f)
+        val selected = RankingWeights(0.15f, 0.15f, 0.50f, 0.20f)
         val applied = resolveResponseWeights(
-            payload = RankingWeightsPayload(0.20f, 0f, 0.80f),
+            payload = RankingWeightsPayload(0.20f, 0f, 0.60f, 0.20f),
             fallback = selected
         )
 
         assertEquals(0.20f, applied.numerology, 0.0001f)
         assertEquals(0f, applied.semantic, 0.0001f)
-        assertEquals(0.80f, applied.sound, 0.0001f)
+        assertEquals(0.60f, applied.sound, 0.0001f)
+        assertEquals(0.20f, applied.similarity, 0.0001f)
+    }
+
+    @Test
+    fun rankingDisplayWeights_useAppliedFormulaNotRequestedFormula() {
+        val applied = RankingWeights(0.50f, 0f, 0.30f, 0.20f)
+        val resultSnapshot = snapshot(mode = MODE_STANDALONE, surname = "").copy(
+            weights = applied,
+            requestedWeights = RankingWeights(0.35f, 0.25f, 0.20f, 0.20f)
+        )
+
+        assertEquals(applied, rankingDisplayWeights(resultSnapshot))
     }
 
     @Test
     fun responseWeights_fallBackForMissingOrInvalidMetadata() {
-        val selected = RankingWeights(0.45f, 0.35f, 0.20f)
+        val selected = RankingWeights(0.35f, 0.25f, 0.20f, 0.20f)
 
         assertEquals(selected, resolveResponseWeights(null, selected))
         assertEquals(
             selected,
-            resolveResponseWeights(RankingWeightsPayload(0f, 0f, 0f), selected)
+            resolveResponseWeights(RankingWeightsPayload(0f, 0f, 0f, 0f), selected)
         )
     }
 
@@ -67,9 +80,18 @@ class RankingStateTest {
 
     @Test
     fun approximateWeightComparison_toleratesSerializationNoiseOnly() {
-        val first = RankingWeights(0.15f, 0.15f, 0.70f)
+        val first = RankingWeights(0.15f, 0.15f, 0.50f, 0.20f)
 
-        assertTrue(first.approximatelyEquals(RankingWeights(0.15001f, 0.14999f, 0.70f)))
+        assertTrue(first.approximatelyEquals(RankingWeights(0.15001f, 0.14999f, 0.50f, 0.20f)))
+    }
+
+    @Test
+    fun rankingWeightPercents_preserveAllFourDimensionsAndTotalOneHundred() {
+        val percentages = rankingWeightPercents(RankingWeights(0.333f, 0.222f, 0.111f, 0.334f))
+
+        assertEquals(100, percentages.sum())
+        assertEquals(4, percentages.size)
+        assertTrue(percentages.all { it >= 0 })
     }
 
     @Test

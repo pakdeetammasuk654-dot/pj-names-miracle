@@ -1,0 +1,21 @@
+[Unit]
+Description=Miracle Names staged enrichment worker
+After=network-online.target postgresql@16-main.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=root
+WorkingDirectory=/opt/pj-names-miracle
+EnvironmentFile=/etc/pj-names-miracle/pj-names-miracle.env
+EnvironmentFile=/etc/pj-names-miracle/name-enrich.env
+Environment="DB_HOST=127.0.0.1"
+ExecStart=/opt/pj-names-miracle/name-enrich-worker -mode run -batch names_ubu_2026_08 -limit 50 -apply
+TimeoutStartSec=infinity
+Nice=10
+UMask=0027
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=multi-user.target

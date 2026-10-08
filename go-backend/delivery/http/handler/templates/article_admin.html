@@ -1,0 +1,237 @@
+{{define "article_admin.html"}}<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>จัดการบทความ | ชื่อดี</title>
+  <link rel="stylesheet" href="/static/styles.css?v=11">
+  <!-- Quill is a free, BSD-licensed rich-text editor. The version is pinned for predictable admin builds. -->
+  <link rel="stylesheet" href="/static/vendor/quill-2.0.3-snow.css">
+  <style>
+    .admin{max-width:1000px;padding-top:36px}.admin h1{color:var(--gold-light);margin-bottom:20px}.admin table{width:100%;border-collapse:collapse;background:var(--bg-card);margin-bottom:28px}.admin th,.admin td{padding:10px;border-bottom:1px solid var(--border-gold);text-align:left}.admin a{color:var(--gold-light)}.admin-thumb{display:block;width:88px;height:62px;object-fit:cover;border:1px solid var(--border-gold);border-radius:6px;background:#1F120B}.admin form{display:grid;gap:12px;background:var(--bg-card);padding:20px;border-radius:14px}.admin input,.admin textarea{width:100%;padding:9px;border:1px solid var(--border-gold);border-radius:8px;background:#1F120B;color:#fff;font:inherit}.admin textarea{min-height:260px}.admin label{color:var(--text-muted)}.admin button{width:max-content;padding:9px 16px;border:0;border-radius:8px;background:var(--gold-primary);color:#140B07;font-weight:700;cursor:pointer}.admin .danger{background:#b94444;color:#fff}.error{color:#ffb4b4}.editor-help{margin:0;color:var(--text-muted);font-size:.9rem}.rich-editor{display:none;overflow:visible;background:#1F120B;border-radius:8px;color:#f8f5eb}.editor-ready .rich-editor{display:block}.editor-ready #content_html{display:none}.admin .ql-toolbar.ql-snow{border-color:var(--border-gold);border-radius:8px 8px 0 0;background:#26160E}#rich-editor.ql-container.ql-snow{position:relative;border-color:var(--border-gold);border-radius:0 0 8px 8px;background:#1F120B;color:#f8f5eb;font:inherit;font-size:1rem}.rich-editor .ql-editor{min-height:320px;line-height:1.8;color:#f8f5eb}.rich-editor .ql-editor.ql-blank::before{color:#a9b9ad;font-style:normal}.rich-editor .ql-editor .first-line-indent-on{text-indent:2em}.rich-editor .ql-editor .ql-color-white{color:#fff7d6}.rich-editor .ql-editor .ql-color-gold{color:#f3e5ab}.rich-editor .ql-editor .ql-color-mint{color:#8ee0ad}.rich-editor .ql-editor .ql-color-sky{color:#82cfff}.rich-editor .ql-editor .ql-color-rose{color:#ffb4b4}.admin .ql-toolbar .ql-color-picker .ql-picker-item[data-value="white"]{background:#fff7d6}.admin .ql-toolbar .ql-color-picker .ql-picker-item[data-value="gold"]{background:#f3e5ab}.admin .ql-toolbar .ql-color-picker .ql-picker-item[data-value="mint"]{background:#8ee0ad}.admin .ql-toolbar .ql-color-picker .ql-picker-item[data-value="sky"]{background:#82cfff}.admin .ql-toolbar .ql-color-picker .ql-picker-item[data-value="rose"]{background:#ffb4b4}.image-resize-overlay{position:absolute;display:none;box-sizing:border-box;border:2px solid var(--gold-light);pointer-events:none;z-index:5}.image-resize-overlay.active{display:block}.image-resize-handle{position:absolute;right:-8px;bottom:-8px;width:15px;height:15px;border:2px solid #1F120B;border-radius:50%;background:var(--gold-light);box-shadow:0 1px 5px rgba(0,0,0,.55);cursor:nwse-resize;pointer-events:auto}.admin .ql-toolbar button,.admin .ql-toolbar .ql-picker-label,.admin .ql-toolbar .ql-picker{color:#f3e5ab!important;opacity:1!important}.admin .ql-toolbar .ql-stroke{stroke:#f3e5ab!important}.admin .ql-toolbar .ql-fill{fill:#f3e5ab!important}.admin .ql-toolbar .ql-picker-options{background:#26160E;border-color:var(--gold-light)}.admin .ql-toolbar .ql-picker-item{color:#fff7d6!important}.admin .ql-toolbar button:hover .ql-stroke,.admin .ql-toolbar button.ql-active .ql-stroke,.admin .ql-toolbar .ql-picker-label:hover .ql-stroke,.admin .ql-toolbar .ql-picker-label.ql-active .ql-stroke{stroke:#fff!important}.admin .ql-toolbar button:hover .ql-fill,.admin .ql-toolbar button.ql-active .ql-fill{fill:#fff!important}.admin .ql-toolbar .ql-picker-label:hover,.admin .ql-toolbar .ql-picker-label.ql-active{color:#fff!important}.admin .ql-toolbar button.ql-firstIndent{width:auto!important;padding:0 7px!important;font-size:.78rem!important;font-weight:700!important}.admin .ql-toolbar button.ql-firstIndent::after{content:"ย่อบรรทัดแรก";white-space:nowrap}@media(max-width:700px){.admin table{font-size:.86rem}.admin th,.admin td{padding:7px}.admin-thumb{width:54px;height:44px}.admin .ql-toolbar{white-space:normal}.rich-editor .ql-formats{margin-right:8px}}
+  </style>
+</head>
+<body>
+  <main class="page-content admin">
+  {{if .Articles}}
+    <h1>จัดการบทความ</h1>
+    <p><a href="/admin/articles/new">+ สร้างบทความใหม่</a></p>
+    <table><thead><tr><th>รูป</th><th>ชื่อ</th><th>สถานะ</th><th>ปักหมุด</th><th></th></tr></thead><tbody>
+    {{range .Articles}}<tr><td><img class="admin-thumb" src="{{if .ImageURL}}{{.ImageURL}}{{else}}/images/app_logo.png{{end}}" alt="รูปปก: {{.Title}}" loading="lazy"></td><td>{{.Title}}</td><td>{{if .IsPublished}}เผยแพร่{{else}}ร่าง{{end}}</td><td>{{.PinOrder}}</td><td><a href="/admin/articles/{{.ID}}/edit">แก้ไข</a> <form method="post" action="/admin/articles/{{.ID}}/delete" style="display:inline;background:none;padding:0"><button class="danger" onclick="return confirm('ลบบทความนี้?')">ลบ</button></form></td></tr>{{end}}
+    </tbody></table>
+  {{else}}
+    <h1>{{if .Article.ID}}แก้ไขบทความ{{else}}สร้างบทความ{{end}}</h1>
+    {{if .Error}}<p class="error">{{.Error}}</p>{{end}}
+    <form id="article-form" method="post" action="{{if .Article.ID}}/admin/articles/{{.Article.ID}}{{else}}/admin/articles{{end}}">
+      <label>Slug<input name="slug" required value="{{.Article.Slug}}"></label>
+      <label>ชื่อบทความ<input name="title" required value="{{.Article.Title}}"></label>
+      <label>ชื่อสั้น<input name="title_short" value="{{.Article.TitleShort}}"></label>
+      <label>คำเกริ่นนำ<textarea name="excerpt" required style="min-height:90px">{{.Article.Excerpt}}</textarea></label>
+      <label>หมวดหมู่<input name="category" value="{{.Article.Category}}"></label>
+      <label>URL รูปปก<input name="image_url" value="{{.Article.ImageURL}}"></label>
+      <label>วันที่เผยแพร่<input type="date" name="published_at" required value="{{.Article.PublishedAt.Format "2006-01-02"}}"></label>
+      <label>ลำดับปักหมุด (0 = ไม่ปักหมุด)<input type="number" min="0" name="pin_order" value="{{.Article.PinOrder}}"></label>
+      <label><input type="checkbox" name="is_published" {{if .Article.IsPublished}}checked{{end}}> เผยแพร่</label>
+      <div class="editor-header-bar" style="display:flex; justify-content:space-between; align-items:center; margin-top:8px; margin-bottom:4px; flex-wrap:wrap; gap:10px;">
+        <div>
+          <label for="content_html" style="font-weight:700; color:var(--gold-light); font-size:1.05rem;">เนื้อหาบทความ</label>
+          <p class="editor-help" style="margin:2px 0 0 0; color:var(--text-muted); font-size:0.88rem;">พิมพ์และจัดรูปแบบได้ทันที หรือสลับเป็นโหมด HTML เพื่อวางโค้ดแบบกำหนดเอง</p>
+        </div>
+        <div class="mode-toggle-group" style="display:flex; gap:8px;">
+          <button type="button" id="btn-mode-visual" class="mode-btn active" style="padding:6px 14px; font-size:0.85rem; border-radius:6px; border:1px solid var(--border-gold); background:var(--gold-primary); color:#140B07; cursor:pointer; font-weight:700; transition:all 0.2s ease;">📝 โหมดจัดรูปแบบ (Visual)</button>
+          <button type="button" id="btn-mode-html" class="mode-btn" style="padding:6px 14px; font-size:0.85rem; border-radius:6px; border:1px solid var(--border-gold); background:#26160E; color:#f3e5ab; cursor:pointer; font-weight:700; transition:all 0.2s ease;">💻 โหมดโค้ด HTML</button>
+        </div>
+      </div>
+      <textarea id="content_html" name="content_html" style="display:none; width:100%; min-height:420px; font-family:Consolas, Monaco, 'Courier New', monospace; font-size:0.92rem; line-height:1.6; background:#07150d; color:#a7f3d0; border:1px solid var(--border-gold); border-radius:8px; padding:12px; box-sizing:border-box;">{{.Article.ContentHTML}}</textarea>
+      <div id="rich-editor" class="rich-editor" aria-label="เนื้อหาบทความ"></div>
+      <button>บันทึก</button><a href="/admin/articles">ยกเลิก</a>
+    </form>
+    <script src="/static/vendor/quill-2.0.3.js"></script>
+    <script>
+      (function () {
+        var form = document.getElementById('article-form');
+        var source = document.getElementById('content_html');
+        var editor = document.getElementById('rich-editor');
+        var btnVisual = document.getElementById('btn-mode-visual');
+        var btnHTML = document.getElementById('btn-mode-html');
+        if (!form || !source || !editor || !window.Quill) return;
+        editor.innerHTML = source.value;
+        var Parchment = Quill.import('parchment');
+        var FirstLineIndent = new Parchment.ClassAttributor('firstIndent', 'first-line-indent', { scope: Parchment.Scope.BLOCK, whitelist: ['on'] });
+        var TextColor = new Parchment.ClassAttributor('color', 'ql-color', { scope: Parchment.Scope.INLINE, whitelist: ['white', 'gold', 'mint', 'sky', 'rose'] });
+        Quill.register(FirstLineIndent, true);
+        Quill.register(TextColor, true);
+        var editorModules = { toolbar: [
+          [{ header: [2, 3, false] }], ['bold', 'italic', 'underline'], [{ color: ['white', 'gold', 'mint', 'sky', 'rose', false] }],
+          [{ list: 'ordered' }, { list: 'bullet' }], ['firstIndent'], [{ align: [] }], ['blockquote', 'link', 'image', 'video'], ['clean']
+        ] };
+        var quill = new Quill(editor, {
+          theme: 'snow',
+          placeholder: 'เริ่มเขียนบทความของคุณ…',
+          modules: editorModules
+        });
+        var toolbar = quill.getModule('toolbar');
+        var isHtmlMode = false;
+
+        function setMode(toHtml) {
+          isHtmlMode = toHtml;
+          var qlToolbar = form.querySelector('.ql-toolbar');
+          if (isHtmlMode) {
+            // Visual -> HTML: sync Quill HTML into Textarea
+            source.value = quill.root.innerHTML;
+            editor.style.display = 'none';
+            if (qlToolbar) qlToolbar.style.display = 'none';
+            source.style.display = 'block';
+            if (btnHTML) {
+              btnHTML.style.background = 'var(--gold-primary)';
+              btnHTML.style.color = '#140B07';
+            }
+            if (btnVisual) {
+              btnVisual.style.background = '#26160E';
+              btnVisual.style.color = '#f3e5ab';
+            }
+          } else {
+            // HTML -> Visual: safely parse Textarea HTML into Quill
+            var rawHtml = source.value;
+            if (rawHtml && rawHtml.trim()) {
+              if (quill.clipboard && typeof quill.clipboard.dangerouslyPasteHTML === 'function') {
+                quill.clipboard.dangerouslyPasteHTML(rawHtml);
+              } else {
+                quill.root.innerHTML = rawHtml;
+              }
+            } else {
+              quill.setText('');
+            }
+            source.style.display = 'none';
+            editor.style.display = 'block';
+            if (qlToolbar) qlToolbar.style.display = 'block';
+            if (btnVisual) {
+              btnVisual.style.background = 'var(--gold-primary)';
+              btnVisual.style.color = '#140B07';
+            }
+            if (btnHTML) {
+              btnHTML.style.background = '#26160E';
+              btnHTML.style.color = '#f3e5ab';
+            }
+          }
+        }
+
+        if (btnVisual) {
+          btnVisual.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (isHtmlMode) setMode(false);
+          });
+        }
+        if (btnHTML) {
+          btnHTML.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (!isHtmlMode) setMode(true);
+          });
+        }
+
+        // Preserve an inline selection while a toolbar picker takes focus.
+        var lastSelectedRange = null;
+        quill.on('selection-change', function (range, oldRange, source) {
+          if (range && range.length > 0) {
+            lastSelectedRange = { index: range.index, length: range.length };
+          } else if (range && source === Quill.sources.USER) {
+            lastSelectedRange = null;
+          }
+        });
+        toolbar.addHandler('color', function (value) {
+          var activeRange = quill.getSelection();
+          var range = activeRange && activeRange.length > 0 ? activeRange : lastSelectedRange;
+          if (range && range.length > 0) {
+            quill.formatText(range.index, range.length, 'color', value || false, Quill.sources.USER);
+            quill.setSelection(range.index, range.length, Quill.sources.SILENT);
+            lastSelectedRange = { index: range.index, length: range.length };
+          } else {
+            quill.format('color', value || false, Quill.sources.USER);
+          }
+        });
+        toolbar.addHandler('firstIndent', function (value) {
+          var range = quill.getSelection();
+          if (range) quill.formatLine(range.index, Math.max(range.length, 1), 'firstIndent', value ? 'on' : false);
+        });
+        (function enableImageResize() {
+          var overlay = document.createElement('div');
+          var handle = document.createElement('div');
+          var image = null;
+          overlay.className = 'image-resize-overlay';
+          handle.className = 'image-resize-handle';
+          overlay.appendChild(handle);
+          quill.container.appendChild(overlay);
+          function positionOverlay() {
+            if (!image) return;
+            var imageBox = image.getBoundingClientRect();
+            var containerBox = quill.container.getBoundingClientRect();
+            overlay.style.left = (imageBox.left - containerBox.left + quill.container.scrollLeft) + 'px';
+            overlay.style.top = (imageBox.top - containerBox.top + quill.container.scrollTop) + 'px';
+            overlay.style.width = imageBox.width + 'px';
+            overlay.style.height = imageBox.height + 'px';
+            overlay.classList.add('active');
+          }
+          function hideOverlay(event) {
+            if (event && (event.target === image || overlay.contains(event.target))) return;
+            image = null;
+            overlay.classList.remove('active');
+          }
+          quill.root.addEventListener('click', function (event) {
+            var selected = event.target.closest('img');
+            if (!selected || !quill.root.contains(selected)) return;
+            image = selected;
+            positionOverlay();
+          });
+          document.addEventListener('pointerdown', hideOverlay);
+          quill.root.addEventListener('scroll', positionOverlay);
+          handle.addEventListener('pointerdown', function (event) {
+            if (!image) return;
+            event.preventDefault();
+            event.stopPropagation();
+            var startX = event.clientX;
+            var startWidth = image.getBoundingClientRect().width;
+            var editorWidth = quill.root.getBoundingClientRect().width;
+            function resize(moveEvent) {
+              var width = Math.max(80, Math.min(editorWidth, startWidth + moveEvent.clientX - startX));
+              image.setAttribute('width', Math.round(width / editorWidth * 100) + '%');
+              image.removeAttribute('height');
+              positionOverlay();
+            }
+            function finish() {
+              document.removeEventListener('pointermove', resize);
+              document.removeEventListener('pointerup', finish);
+            }
+            document.addEventListener('pointermove', resize);
+            document.addEventListener('pointerup', finish);
+          });
+        }());
+        quill.getModule('toolbar').addHandler('image', function () {
+          var url = window.prompt('วาง URL ของรูปภาพ (แนะนำให้อัปโหลดรูปที่เมนูคลังรูปก่อน)');
+          if (url && /^(https?:\/\/|\/images\/articles\/)/i.test(url.trim())) quill.insertEmbed(quill.getSelection(true).index, 'image', url.trim(), 'user');
+          else if (url) window.alert('กรุณาใช้ URL ที่ขึ้นต้นด้วย https://, http:// หรือ /images/articles/');
+        });
+        toolbar.addHandler('video', function () {
+          var url = window.prompt('วางลิงก์วิดีโอ YouTube หรือ YouTube Shorts');
+          var match = url && url.trim().match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|shorts\/|embed\/))([A-Za-z0-9_-]{11})/i);
+          if (match) {
+            var isShort = /youtube\.com\/shorts\//i.test(url);
+            var insertAt = quill.getSelection(true).index;
+            quill.insertEmbed(insertAt, 'video', 'https://www.youtube-nocookie.com/embed/' + match[1], 'user');
+            var insertedLeaf = quill.getLeaf(insertAt);
+            var video = insertedLeaf && insertedLeaf[0] && insertedLeaf[0].domNode;
+            if (video && isShort) video.classList.add('video-portrait');
+          }
+          else if (url) window.alert('กรุณาใช้ลิงก์ YouTube หรือ YouTube Shorts ที่ถูกต้อง');
+        });
+        form.classList.add('editor-ready');
+        form.addEventListener('submit', function () {
+          if (!isHtmlMode) {
+            source.value = quill.root.innerHTML;
+          }
+        });
+      }());
+    </script>
+  {{end}}
+  </main>
+</body>
+</html>{{end}}

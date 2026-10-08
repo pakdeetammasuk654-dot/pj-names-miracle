@@ -1,0 +1,43 @@
+{{define "articles.html"}}
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="index,follow,max-image-preview:large,max-snippet:-1">
+  <meta name="description" content="รวมคู่มือเลือกชื่อ เปลี่ยนชื่อ ตั้งชื่อมงคล เลขศาสตร์ และพลังเงา พร้อมตัวอย่างวิเคราะห์ชื่อจากระบบชื่อดี 4 มิติ">
+  <link rel="canonical" href="https://xn--b3cu8e7ah6h.com/articles">
+  <link rel="icon" type="image/png" href="/images/app_logo-256.png">
+  <link rel="manifest" href="/site.webmanifest">
+  <meta property="og:type" content="website">
+  <meta property="og:locale" content="th_TH">
+  <meta property="og:site_name" content="ชื่อดี 4 มิติ">
+  <meta property="og:title" content="บทความชื่อมงคล เลขศาสตร์ และพลังเงา">
+  <meta property="og:description" content="คู่มือเลือกชื่อ เปลี่ยนชื่อ และวิเคราะห์ชื่ออย่างเป็นระบบจากชื่อดี 4 มิติ">
+  <meta property="og:url" content="https://xn--b3cu8e7ah6h.com/articles">
+  <meta property="og:image" content="https://xn--b3cu8e7ah6h.com/images/app_logo-512.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="บทความชื่อมงคล เลขศาสตร์ และพลังเงา">
+  <meta name="twitter:description" content="คู่มือเลือกชื่อ เปลี่ยนชื่อ และวิเคราะห์ชื่ออย่างเป็นระบบจากชื่อดี 4 มิติ">
+  <meta name="twitter:image" content="https://xn--b3cu8e7ah6h.com/images/app_logo-512.png">
+  <title>บทความชื่อมงคล เลขศาสตร์ และพลังเงา | ชื่อดี</title>
+  <link rel="stylesheet" href="/static/styles.css?v=11">
+  <script async src="https://www.googletagmanager.com/gtag/js?id=G-9P8FBW8RTG"></script>
+  <script src="/static/ga4.js?v=1"></script>
+  {{.JSONLD}}
+  <style>
+    .article-page{padding-top:42px;font-family:'Sukhumvit Set','Prompt','Sarabun',system-ui,-apple-system,sans-serif}.article-page h1{color:var(--gold-light);font-size:clamp(2rem,5vw,3rem);margin-bottom:8px;font-family:'Sukhumvit Set','Prompt','Sarabun',system-ui,-apple-system,sans-serif;font-weight:700}.article-lead{color:var(--text-muted);margin-bottom:32px;max-width:760px;font-family:'Sukhumvit Set','Prompt','Sarabun',system-ui,-apple-system,sans-serif}.article-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:20px}.article-card{display:block;overflow:hidden;border:1px solid var(--border-gold);border-radius:18px;background:var(--bg-card);color:inherit;text-decoration:none;transition:transform .2s ease,border-color .2s ease;font-family:'Sukhumvit Set','Prompt','Sarabun',system-ui,-apple-system,sans-serif}.article-card:hover{transform:translateY(-4px);border-color:var(--gold-primary)}.article-card img{width:100%;height:180px;object-fit:cover;background:#0b1710}.article-card-copy{padding:18px}.article-category{color:var(--gold-accent);font-weight:700;font-size:.85rem;font-family:'Sukhumvit Set','Prompt','Sarabun',system-ui,-apple-system,sans-serif}.article-card h2{font-size:1.25rem;line-height:1.4;margin:7px 0;font-family:'Sukhumvit Set','Prompt','Sarabun',system-ui,-apple-system,sans-serif;font-weight:700}.article-card p{color:var(--text-muted);font-size:.96rem;line-height:1.65;font-family:'Sukhumvit Set','Prompt','Sarabun',system-ui,-apple-system,sans-serif}.article-date{display:block;color:var(--text-subtle);font-size:.82rem;margin-top:12px;font-family:'Sukhumvit Set','Prompt','Sarabun',system-ui,-apple-system,sans-serif}
+  </style>
+</head>
+<body>
+  <header class="site-header"><div class="header-container"><a href="/" class="brand-link"><img src="/images/app_logo-256.png?v=4" alt="โลโก้ชื่อดี" class="brand-logo-img" width="36" height="36"><span>ชื่อดี.com</span></a><ul class="nav-links"><li><a href="/">หน้าแรก</a></li><li><a href="/auspicious-calendar">ดูฤกษ์ยาม</a></li><li><a href="/articles" class="active">บทความ</a></li><li><a href="/about">เกี่ยวกับเรา</a></li><li><a href="/methodology">วิธีคิดชื่อ</a></li><li><a href="/download">ดาวน์โหลดแอป</a></li><li class="chat-nav-item"><a class="nav-chat-cta" href="/chat">✦ ปรึกษาคุณทญา</a></li></ul></div></header>
+  <main class="page-content article-page">
+    <h1>บทความชื่อมงคล</h1>
+    <p class="article-lead">คู่มือเลือกชื่อ เปลี่ยนชื่อ เลขศาสตร์ และพลังเงา พร้อมตัวอย่างวิเคราะห์ชื่อ เพื่อช่วยให้คุณตัดสินใจอย่างมีข้อมูลและเข้าใจหลักการของชื่อดี 4 มิติ</p>
+    <section class="article-grid" aria-label="บทความทั้งหมด">{{range .Articles}}<a class="article-card" href="/articles/{{.Slug}}"><img src="{{.ImageURL}}" alt="{{.Title}}" width="640" height="360" loading="lazy" decoding="async"><div class="article-card-copy"><span class="article-category">{{.Category}}</span><h2>{{.Title}}</h2><p>{{.Excerpt}}</p><span class="article-date">เผยแพร่ {{.PublishedAt.Format "2 January 2006"}}</span></div></a>{{end}}</section>
+  </main>
+  <a class="floating-chat-cta" href="/chat" aria-label="แชตปรึกษาคุณทญา"><span>✦</span><strong>ปรึกษาคุณทญา</strong></a>
+  <script src="/static/chat_badge.js" defer></script><script src="/static/nav.js" defer></script>
+</body>
+</html>
+{{end}}
