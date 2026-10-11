@@ -164,7 +164,7 @@ struct RankingResultsView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("100 อันดับชื่อที่ดีที่สุด")
                         .font(.sarabun(14, weight: .bold)).foregroundStyle(Color.brandCream)
-                    Text("เปิดชื่อทั้งหมดแบบถาวร")
+                    Text("เปิดให้ดูฟรี 3 อันดับแรก · ปลดล็อกอีก 97 ชื่อถาวร")
                         .font(.sarabun(11)).foregroundStyle(.white.opacity(0.78))
                     Text(purchaseManager.displayPrice)
                         .font(.sarabun(10, weight: .bold)).foregroundStyle(Color.brandCream)
@@ -381,7 +381,7 @@ struct RankingResultsView: View {
     private func resultRow(_ item: NameResultItem, isEvenRow: Bool = true) -> some View {
         HStack(spacing: 0) {
             Text("#\(item.rank)").font(.sarabun(14, weight: .bold)).foregroundStyle(item.rank <= 3 ? Color.brandGold : .secondary).frame(width: 54)
-            Text(maskedCandidate(item.thname))
+            Text(maskedCandidate(item.thname, rank: item.rank))
                 .font(.sarabun(17, weight: .bold))
                 .lineLimit(1)
                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -488,8 +488,9 @@ struct RankingResultsView: View {
         return viewModel.target == .surname ? "\(viewModel.referenceName) \(candidate)" : "\(candidate) \(viewModel.referenceName)"
     }
 
-    private func maskedCandidate(_ candidate: String) -> String {
+    private func maskedCandidate(_ candidate: String, rank: Int) -> String {
         guard !purchaseManager.effectiveIsUnlocked, !candidate.isEmpty else { return candidate }
+        if rank <= 3 { return candidate }
         let visibleCount = max(2, candidate.count / 3)
         return String(candidate.prefix(visibleCount)) + "***"
     }

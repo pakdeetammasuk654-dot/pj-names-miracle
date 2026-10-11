@@ -145,8 +145,8 @@ class NameSearchViewModel : ViewModel() {
         billingManager?.restorePurchases()
     }
 
-    fun getDisplayName(fullName: String): String {
-        if (isUnlocked.value) return fullName
+    fun getDisplayName(fullName: String, isFree: Boolean = false): String {
+        if (isUnlocked.value || isFree) return fullName
         if (fullName.isBlank()) return fullName
         val visibleLength = (fullName.length / 3).coerceAtLeast(2)
         val visiblePart = fullName.take(visibleLength)

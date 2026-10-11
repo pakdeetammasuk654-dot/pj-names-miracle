@@ -440,10 +440,12 @@ fun NameResultsScreen(
                     }
                     itemsIndexed(filteredResults, key = { _, item -> item.nameId }) { index, item ->
                         val originalIndex = results.indexOfFirst { it.nameId == item.nameId }.coerceAtLeast(index)
-                        val candidateName = if (!isUnlocked) maskNameCandidate(item.thName) else item.thName
+                        val rank = resolvedRank(item, originalIndex)
+                        val isFree = rank <= 3
+                        val candidateName = if (!isUnlocked && !isFree) maskNameCandidate(item.thName) else item.thName
                         val displayName = candidateName
                         NameRankingRow(
-                            rank = resolvedRank(item, originalIndex),
+                            rank = rank,
                             item = item,
                             displayName = displayName,
                             isCombined = snapshot.isCombined,
@@ -1068,7 +1070,7 @@ private fun GoldLifetimeUnlockCard(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "เปิดชื่อทั้งหมดแบบถาวร",
+                    text = "เปิดให้ดูฟรี 3 อันดับแรก · ปลดล็อกอีก 97 ชื่อถาวร",
                     color = Color.White.copy(alpha = 0.88f),
                     fontSize = 11.sp,
                     lineHeight = 15.sp

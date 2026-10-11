@@ -189,8 +189,9 @@ fun BlessingCardScreen(
             }
         } else {
             val selectedName = selectedItem
+            val isFreeName = selectedName.rank in 1..3
             val rawFullName = snapshot.fullName(selectedName.thName)
-            val fullName = viewModel.getDisplayName(rawFullName)
+            val fullName = viewModel.getDisplayName(rawFullName, isFree = isFreeName)
             val goldCardText = selectedTheme.nameTextColor
             val goldCardSecondaryText = selectedTheme.meaningTextColor
             val goldCardDivider = selectedTheme.dividerColor
@@ -227,6 +228,14 @@ fun BlessingCardScreen(
                     verticalArrangement = Arrangement.Top
                 ) {
                     if (!isUnlocked) {
+                        val bannerIcon = if (isFreeName) "✨" else "🔒"
+                        val bannerText = if (isFreeName) {
+                            "3 อันดับแรกเปิดให้ดูฟรี · ปลดล็อกอีก 97 ชื่อเพื่อดูครบ 100 อันดับ"
+                        } else {
+                            "ตัวอย่างการ์ด · เปิดชื่อทั้งหมดเพื่อสร้างแรงดึงดูด"
+                        }
+                        val buttonText = if (isFreeName) "เปิดชื่อทั้งหมด" else "เปิดชื่อ"
+
                         Surface(
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -241,9 +250,9 @@ fun BlessingCardScreen(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(9.dp)
                             ) {
-                                Text("🔒", fontSize = 16.sp)
+                                Text(bannerIcon, fontSize = 16.sp)
                                 Text(
-                                    text = "ตัวอย่างการ์ด · เปิดชื่อทั้งหมดเพื่อสร้างแรงดึงดูด",
+                                    text = bannerText,
                                     modifier = Modifier.weight(1f),
                                     fontSize = 11.sp,
                                     fontWeight = FontWeight.SemiBold,
@@ -255,7 +264,7 @@ fun BlessingCardScreen(
                                     colors = ButtonDefaults.textButtonColors(contentColor = Color(0xFF123322)),
                                     contentPadding = PaddingValues(horizontal = 8.dp, vertical = 4.dp)
                                 ) {
-                                    Text("เปิดชื่อ", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                    Text(buttonText, fontSize = 12.sp, fontWeight = FontWeight.Bold)
                                 }
                             }
                         }

@@ -24,9 +24,15 @@ struct BlessingCardView: View {
                 VStack(spacing: 14) {
                     if !purchaseManager.effectiveIsUnlocked {
                         HStack(spacing: 8) {
-                            Image(systemName: "lock.fill")
-                            Text("ตัวอย่างการ์ด · เปิดชื่อทั้งหมดเพื่อสร้างแรงดึงดูด")
-                                .font(.sarabun(11, weight: .semibold))
+                            if isFreeName {
+                                Text("✨")
+                                Text("3 อันดับแรกเปิดให้ดูฟรี · ปลดล็อกอีก 97 ชื่อเพื่อดูครบทั้ง 100 อันดับ")
+                                    .font(.sarabun(11, weight: .semibold))
+                            } else {
+                                Image(systemName: "lock.fill")
+                                Text("ตัวอย่างการ์ด · เปิดชื่อทั้งหมดเพื่อสร้างแรงดึงดูด")
+                                    .font(.sarabun(11, weight: .semibold))
+                            }
                             Spacer(minLength: 0)
                             Button {
                                 Task { await purchaseManager.purchase() }
@@ -34,7 +40,7 @@ struct BlessingCardView: View {
                                 if purchaseManager.isBusy {
                                     ProgressView().tint(Color.brandGreen)
                                 } else {
-                                    Text("เปิดชื่อ")
+                                    Text(isFreeName ? "เปิดชื่อทั้งหมด" : "เปิดชื่อ")
                                 }
                             }
                             .font(.sarabun(11, weight: .bold))
@@ -351,8 +357,11 @@ struct BlessingCardView: View {
             : "\(candidate) \(viewModel.referenceName)"
     }
 
+    private var isFreeName: Bool { item.rank <= 3 }
+
     private var maskedCandidate: String {
         guard !purchaseManager.effectiveIsUnlocked, !item.thname.isEmpty else { return item.thname }
+        if isFreeName { return item.thname }
         let visibleCount = max(2, item.thname.count / 3)
         return String(item.thname.prefix(visibleCount)) + "***"
     }
