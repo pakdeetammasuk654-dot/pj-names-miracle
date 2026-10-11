@@ -164,7 +164,7 @@ struct RankingResultsView: View {
                 VStack(alignment: .leading, spacing: 3) {
                     Text("100 อันดับชื่อที่ดีที่สุด")
                         .font(.sarabun(14, weight: .bold)).foregroundStyle(Color.brandCream)
-                    Text("เปิดให้ดูฟรี 3 อันดับแรก · ปลดล็อกอีก 97 ชื่อถาวร")
+                    Text("ปลดล็อกเพื่อดู 100 ชื่อ")
                         .font(.sarabun(11)).foregroundStyle(.white.opacity(0.78))
                     Text(purchaseManager.displayPrice)
                         .font(.sarabun(10, weight: .bold)).foregroundStyle(Color.brandCream)

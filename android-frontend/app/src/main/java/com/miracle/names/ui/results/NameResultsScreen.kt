@@ -1070,7 +1070,7 @@ private fun GoldLifetimeUnlockCard(
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "เปิดให้ดูฟรี 3 อันดับแรก · ปลดล็อกอีก 97 ชื่อถาวร",
+                    text = "ปลดล็อกเพื่อดู 100 ชื่อ",
                     color = Color.White.copy(alpha = 0.88f),
                     fontSize = 11.sp,
                     lineHeight = 15.sp
