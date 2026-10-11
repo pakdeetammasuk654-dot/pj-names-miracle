@@ -230,7 +230,7 @@ fun BlessingCardScreen(
                     if (!isUnlocked) {
                         val bannerIcon = if (isFreeName) "✨" else "🔒"
                         val bannerText = if (isFreeName) {
-                            "3 อันดับแรกเปิดให้ดูฟรี · ปลดล็อกอีก 97 ชื่อเพื่อดูครบ 100 อันดับ"
+                            "ปลดล็อกเพื่อดู 100 อันดับ"
                         } else {
                             "ตัวอย่างการ์ด · เปิดชื่อทั้งหมดเพื่อสร้างแรงดึงดูด"
                         }

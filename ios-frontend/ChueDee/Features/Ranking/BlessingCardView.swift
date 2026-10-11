@@ -26,8 +26,8 @@ struct BlessingCardView: View {
                         HStack(spacing: 8) {
                             if isFreeName {
                                 Text("✨")
-                                Text("3 อันดับแรกเปิดให้ดูฟรี · ปลดล็อกอีก 97 ชื่อเพื่อดูครบทั้ง 100 อันดับ")
-                                    .font(.sarabun(11, weight: .semibold))
+                                Text("ปลดล็อกเพื่อดู 100 อันดับ")
+                                    .font(.sarabun(12, weight: .bold))
                             } else {
                                 Image(systemName: "lock.fill")
                                 Text("ตัวอย่างการ์ด · เปิดชื่อทั้งหมดเพื่อสร้างแรงดึงดูด")
