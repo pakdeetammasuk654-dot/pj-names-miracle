@@ -1,8 +1,8 @@
 package handler
 
 const articleDownloadCTA = `<script async src="https://www.googletagmanager.com/gtag/js?id=G-9P8FBW8RTG"></script><script src="/static/ga4.js?v=1"></script><script src="/static/article-share.js?v=1"></script><link rel="stylesheet" href="/static/article-download-cta.css?v=4"><section class="article-download-cta" aria-labelledby="article-download-title">
-  <h2 id="article-download-title">ค้นหาและจัดอันดับชื่อไทยด้วยระบบ Data Science</h2>
-  <p>วิเคราะห์ความหมาย เลขศาสตร์ พลังเงา และความไพเราะ เพื่อช่วยคุณค้นหาชื่อที่เหมาะที่สุด</p>
+  <h2 id="article-download-title">วิเคราะห์ชื่อมงคล 4 มิติ — ดูฟรี 3 อันดับแรก</h2>
+  <p>ตรวจลึกทั้งเลขศาสตร์ พลังเงา และทักษา พร้อมสร้างการ์ดอวยพรมงคลดาวน์โหลดฟรีบน iOS และ Android</p>
   <div class="article-download-actions" aria-label="เลือกแพลตฟอร์มเพื่อติดตั้งแอป">
     <a href="https://play.google.com/store/apps/details?id=com.numberniceic.app" target="_blank" rel="noopener noreferrer" class="article-store-button article-store-google" aria-label="ดาวน์โหลดแอปบน Google Play">
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 2.4 14.4 12 3.5 21.6c-.3-.4-.5-.9-.5-1.5V3.9c0-.6.2-1.1.5-1.5Z" fill="#00a173"/><path d="m14.4 12 3.1-2.7 3.6 2.1c.8.5.8 1.2 0 1.7l-3.6 2.1-3.1-3.2Z" fill="#f7b500"/><path d="M3.5 2.4c.4-.5 1-.5 1.6-.2l12.4 7.1-3.1 2.7L3.5 2.4Z" fill="#e84b4b"/><path d="m3.5 21.6 10.9-9.6 3.1 3.2-12.4 7.1c-.6.3-1.2.2-1.6-.7Z" fill="#3f8efc"/></svg>

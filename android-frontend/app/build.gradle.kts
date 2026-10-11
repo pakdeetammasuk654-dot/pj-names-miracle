@@ -15,8 +15,8 @@ android {
         applicationId = "com.numberniceic.app"
         minSdk = 26
         targetSdk = 36
-        versionCode = 31
-        versionName = "1.4.14"
+        versionCode = 32
+        versionName = "1.5.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

@@ -435,11 +435,19 @@ The non-destructive governance migrations and read-only preflight live under [`g
     - **Production VPS Nginx Proxy Fix**:
       - Fixed bug where celebrity names list disappeared on clients due to `/etc/nginx/sites-enabled/xn--b3cu8e7ah6h.com` proxying `/api/v1/` to legacy port 8095. Corrected to `http://pj_names_miracle_backend` (port 18080). Verified `/api/v1/celebrities` returns 200 with all 11 records.
     - **Verification**: Clean builds on both iOS (`xcodebuild` BUILD SUCCEEDED) and Android (`assembleDebug` BUILD SUCCESSFUL).
-  - **Upcoming Tasks for Next Session**:
-    - **Step 2 (ASO & Store Presence Optimization)**:
-      - App Store & Google Play metadata tuning: Title, Subtitle, and Keywords targeting high-intent Thai search terms ("ตั้งชื่อลูก", "เปลี่ยนชื่อ", "ชื่อมงคล", "ดูดวงชื่อ", "เลขศาสตร์", "ทักษา", "ฤกษ์มงคล").
-      - Review screenshots and descriptions to highlight the free trial experience (ดูฟรี 3 อันดับ + การ์ดอวยพรมงคล).
-    - **Step 3 (Organic Marketing & Web-to-App Funnel)**:
-      - Social media content angles (TikTok / Reels / Lemon8) regarding name checking and auspicious cards.
-      - Web article SEO and conversion funnel on `ชื่อดี.com` driving direct app installs.
+  - **Step 2 (ASO & Store Presence Optimization) - Completed**:
+    - **Google Play Store (Android)**:
+      - Updated Short Description to `"วิเคราะห์ชื่อมงคล 4 มิติ ดูฟรี 3 อันดับแรก พร้อมตรวจเลขศาสตร์ พลังเงา และทักษา"`.
+      - Rewrote Full Description emphasizing Freemium trial (3 free names + free blessing cards) and keyword density (`ตั้งชื่อลูก`, `เปลี่ยนชื่อ`, `เลขศาสตร์`, `พลังเงา`, `ทักษา`).
+      - Bumped Android version to `1.5.0` (versionCode `32`). Built signed `ChueDee-1.5.0-build32.aab` and submitted to Google Play Production track.
+    - **Apple App Store (iOS)**:
+      - Created version `1.1.0` on App Store Connect.
+      - Updated Promotional Text, Description (clean ASCII formatting without disallowed emojis), and high-intent Keywords field (`ชื่อดี,ตั้งชื่อมงคล,ตั้งชื่อลูก,เปลี่ยนชื่อ,ดูดวงชื่อ,เลขศาสตร์,พลังเงา,ทักษา,ฤกษ์คลอด,ฤกษ์มงคล`).
+      - Bumped iOS `MARKETING_VERSION` to `1.1.0` and `CURRENT_PROJECT_VERSION` to `22`. Archived, exported, and uploaded build `22` via Xcode Organizer. Submitted for App Store Review.
+  - **Step 3 (Organic Marketing & Web-to-App Funnel) - Completed**:
+    - **Web-to-App Conversion Funnel**:
+      - Updated `article_download_cta.go` to `"วิเคราะห์ชื่อมงคล 4 มิติ — ดูฟรี 3 อันดับแรก"` with CTA copy highlighting free cards and unmasked preview.
+      - Updated `download.html` store-facts pill list to highlight `"✨ ทดลองดูผลวิเคราะห์ฟรี 3 อันดับแรก"` and `"🎴 ดาวน์โหลดการ์ดอวยพรมงคลฟรี"`.
+      - Cross-compiled Go backend binary, deployed live to Production server `43.228.85.200`, restarted `pj-names-miracle.service`, and verified live HTTP 200 responses on articles and download pages.
+    - **Organic Marketing Assets**: Created viral TikTok/Reels/Lemon8 content scripts targeting baby naming, shadow number checking, and aesthetic blessing card wallpapers.
 
