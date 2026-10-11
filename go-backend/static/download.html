@@ -106,26 +106,35 @@
     .store-facts {
       display: flex;
       flex-wrap: wrap;
-      gap: 10px;
-      margin: 24px 0 28px;
+      gap: 12px 24px;
+      margin: 22px 0 28px;
+      padding: 0;
       list-style: none;
     }
 
     .store-facts li {
-      padding: 7px 12px;
-      border: 1px solid rgba(255, 255, 255, 0.13);
-      border-radius: 10px;
-      background: rgba(255, 255, 255, 0.055);
-      color: rgba(255, 255, 255, 0.82);
-      font-size: 0.86rem;
-      font-weight: 600;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      padding: 0;
+      border: none;
+      background: transparent;
+      color: rgba(255, 255, 255, 0.88);
+      font-size: 0.95rem;
+      font-weight: 500;
     }
 
-    .store-facts li.highlight-gold {
-      border: 1px solid rgba(212, 175, 55, 0.65);
-      background: rgba(212, 175, 55, 0.16);
-      color: #fff;
-      font-weight: 700;
+    .store-facts li .fact-check {
+      display: inline-grid;
+      place-items: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: rgba(97, 217, 145, 0.16);
+      color: #61d991;
+      font-size: 0.82rem;
+      font-weight: 800;
+      line-height: 1;
     }
 
     .play-button {
@@ -436,10 +445,10 @@
         <div class="eyebrow">✨ พิเศษ! ทดลองใช้งานฟรี — ดูผลวิเคราะห์ 3 อันดับแรกได้ทันที</div>
         <h1 class="download-title">ชื่อที่ใช่ เริ่มต้นที่แอป <span>“ชื่อดี ชื่อมงคล 4 มิติ”</span></h1>
         <p class="download-lead">ค้นหา วิเคราะห์ และจัดอันดับชื่อมงคลด้วยระบบ 4 มิติ ดูผลวิเคราะห์ฟรี 3 อันดับแรก พร้อมสร้างและดาวน์โหลดการ์ดอวยพรมงคลความละเอียดสูงได้ฟรีบน Android และ iOS</p>
-        <ul class="store-facts" aria-label="ข้อมูลแอป">
-          <li class="highlight-gold">✨ ทดลองดูผลวิเคราะห์ฟรี 3 อันดับแรก</li>
-          <li class="highlight-gold">🎴 ดาวน์โหลดการ์ดอวยพรมงคลฟรี</li>
-          <li>📱 รองรับ Android 8.0+ และ iOS 15.0+</li>
+        <ul class="store-facts" aria-label="สิทธิประโยชน์ของแอป">
+          <li><span class="fact-check">✓</span> <span>ทดลองดูผลวิเคราะห์ฟรี <strong>3 อันดับแรก</strong></span></li>
+          <li><span class="fact-check">✓</span> <span>ดาวน์โหลดการ์ดอวยพรมงคลฟรี</span></li>
+          <li><span class="fact-check">✓</span> <span>รองรับ Android 8.0+ และ iOS 15.0+</span></li>
         </ul>
         <div style="display: flex; flex-wrap: wrap; gap: 12px; align-items: center; margin-top: 18px;">
           <a href="https://play.google.com/store/apps/details?id=com.numberniceic.app" target="_blank" rel="noopener noreferrer" class="play-button" aria-label="ดาวน์โหลดแอปชื่อดีจาก Google Play">
