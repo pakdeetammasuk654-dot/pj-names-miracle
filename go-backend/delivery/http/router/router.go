@@ -79,6 +79,7 @@ func SetupRouter(
 	r.HEAD("/admin/login", func(c *gin.Context) { c.Status(http.StatusGone) })
 	if supportChatHandler != nil {
 		r.GET("/chat", supportChatHandler.CustomerChatPage)
+		r.HEAD("/chat", supportChatHandler.CustomerChatPage)
 	}
 	r.GET("/articles", articleHandler.List)
 	r.HEAD("/articles", articleHandler.List)
