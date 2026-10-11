@@ -421,3 +421,25 @@ The non-destructive governance migrations and read-only preflight live under [`g
     - Cross-compiled Linux AMD64 binary `pj-names-backend-linux`.
     - Synchronized `/static/` assets and updated binary to production server `43.228.85.200` at `/opt/pj-names-miracle/`.
     - Restarted `pj-names-miracle.service` and verified HTTP 200 health check on local upstream `127.0.0.1:18080` and live CDN `https://ชื่อดี.com`.
+
+- **2026-10-11 Growth Optimization, Freemium Unmasking & Celebrity API Fix**:
+  - **Context & Diagnosis**: App deployed ~1 month with low conversion/traffic (3 paid users). Root causes identified: 100% masking was too aggressive (users could not experience value before paying), low discoverability/ASO on stores, and lack of organic distribution channels.
+  - **Step 1 Implemented & Verified**:
+    - **Freemium Unmasking (Top 3 Names Free)**:
+      - Backend already had `freeVisibleNameCount = 3`.
+      - Android & iOS clients updated to display top 3 ranked names (`rank <= 3`) unmasked without `***` blur.
+      - Blessing Card unmasked for top 3 names, allowing free wallpaper generation/preview and download.
+    - **Microcopy Polish**:
+      - Blessing Card banner pill updated to `"ปลดล็อกเพื่อดู 100 อันดับ"` (Android & iOS).
+      - VIP unlock card subtitle updated to `"ปลดล็อกเพื่อดู 100 ชื่อ"` (Android & iOS).
+    - **Production VPS Nginx Proxy Fix**:
+      - Fixed bug where celebrity names list disappeared on clients due to `/etc/nginx/sites-enabled/xn--b3cu8e7ah6h.com` proxying `/api/v1/` to legacy port 8095. Corrected to `http://pj_names_miracle_backend` (port 18080). Verified `/api/v1/celebrities` returns 200 with all 11 records.
+    - **Verification**: Clean builds on both iOS (`xcodebuild` BUILD SUCCEEDED) and Android (`assembleDebug` BUILD SUCCESSFUL).
+  - **Upcoming Tasks for Next Session**:
+    - **Step 2 (ASO & Store Presence Optimization)**:
+      - App Store & Google Play metadata tuning: Title, Subtitle, and Keywords targeting high-intent Thai search terms ("ตั้งชื่อลูก", "เปลี่ยนชื่อ", "ชื่อมงคล", "ดูดวงชื่อ", "เลขศาสตร์", "ทักษา", "ฤกษ์มงคล").
+      - Review screenshots and descriptions to highlight the free trial experience (ดูฟรี 3 อันดับ + การ์ดอวยพรมงคล).
+    - **Step 3 (Organic Marketing & Web-to-App Funnel)**:
+      - Social media content angles (TikTok / Reels / Lemon8) regarding name checking and auspicious cards.
+      - Web article SEO and conversion funnel on `ชื่อดี.com` driving direct app installs.
+
